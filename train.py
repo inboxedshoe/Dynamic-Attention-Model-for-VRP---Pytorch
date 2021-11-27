@@ -35,7 +35,7 @@ def train_model(optimizer,
                 batch_verbose = 1000,
                 graph_size = 20,
                 filename = None,
-                mem_efficient=True,
+                mem_efficient=False,
                 ):
 
     if filename is None:
