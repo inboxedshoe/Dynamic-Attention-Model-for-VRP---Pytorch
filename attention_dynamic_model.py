@@ -19,7 +19,10 @@ class AttentionDynamicModel(nn.Module):
                  embedding_dim,
                  n_encode_layers=2,
                  n_heads=8,
-                 tanh_clipping=10.
+                 tanh_clipping=10.,
+                 attention_type="full",
+                 attention_neighborhood=0,
+                 batch_norm=False
                  ):
         
         super().__init__()
@@ -29,6 +32,13 @@ class AttentionDynamicModel(nn.Module):
         self.n_encode_layers = n_encode_layers
         self.decode_type = None
 
+        # new additions
+        self.attention_type = {"full": 0,
+                               "entmax": 1,
+                               "sparsemax": 2}.get(attention_type, 0)
+
+        self.attention_neighborhood = attention_neighborhood
+
         # attributes for VRP problem
         self.problem = AgentVRP
         self.n_heads = n_heads
@@ -36,7 +46,9 @@ class AttentionDynamicModel(nn.Module):
         # Encoder part
         self.embedder = GraphAttentionEncoder(input_dim=self.embedding_dim,
                                               num_heads=self.n_heads,
-                                              num_layers=self.n_encode_layers
+                                              num_layers=self.n_encode_layers,
+                                              attention_type=attention_type,
+                                              batch_norm=batch_norm
                                               )
 
         # Decoder part
@@ -133,7 +145,7 @@ class AttentionDynamicModel(nn.Module):
         if mask is not None:
             mask = mask.unsqueeze(1)
 
-        attention = scaled_attention(Q, K, V, mask) # (batch_size, n_heads, seq_len_q, head_depth)
+        attention = scaled_attention(Q, K, V, mask, attention_type=self.attention_type)  # self.attention_type) # (batch_size, n_heads, seq_len_q, head_depth)
         # transpose attention to (batch_size, seq_len_q, n_heads, head_depth)
         attention = attention.transpose(1, 2).contiguous()
         # concatenate results of all heads (batch_size, seq_len_q, self.output_dim)
@@ -215,6 +227,11 @@ class AttentionDynamicModel(nn.Module):
         self.batch_size = inputs[0].shape[0]
 
         state = self.problem(inputs) # use CPU inputs for state
+
+        #tell the problem we will be using attention neighborhood during generation
+        if self.attention_neighborhood > 0:
+            state.set_neighborhood_mask(self.attention_neighborhood)
+
         inputs = self.set_input_device(inputs) # sent inputs to GPU for training if it's being used
         sequences = []
         ll = torch.zeros(self.batch_size)
@@ -251,7 +268,7 @@ class AttentionDynamicModel(nn.Module):
 
                 # next step is to select node
                 if pre_selects is None:
-                    selected = self._select_node(log_p.detach()) # (batch_size,)
+                    selected = self._select_node(log_p.detach())  # (batch_size,)
                 else:
                     selected = pre_selects[pre_select_idx]
 

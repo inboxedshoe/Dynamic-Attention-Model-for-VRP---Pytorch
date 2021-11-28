@@ -27,6 +27,8 @@ class AgentVRP():
         # Step counter
         self.i = torch.zeros(1, dtype=torch.int64)
 
+        self.neighborhood_mask = None
+
     @staticmethod
     def outer_pr(a, b):
         """ Outer product of a and b row vectors.
@@ -56,7 +58,14 @@ class AgentVRP():
         att_mask = AgentVRP.outer_pr(att_mask, ones_mask) \
                     + AgentVRP.outer_pr(ones_mask, att_mask) \
                     - AgentVRP.outer_pr(att_mask, att_mask) # (batch_size, n_nodes, n_nodes)
-        return att_mask == 1, cur_num_nodes
+
+        att_mask = att_mask == 1
+
+        # if we have a neighborhood mask, apply it
+        if self.neighborhood_mask is not None:
+            att_mask = att_mask | self.neighborhood_mask
+
+        return att_mask, cur_num_nodes
 
     def all_finished(self):
         """ Checks if all routes are finished
@@ -82,15 +91,21 @@ class AgentVRP():
         # Mark nodes which exceed vehicle capacity
         exceeds_cap = self.demand + self.used_capacity > self.VEHICLE_CAPACITY
 
-        # Maks nodes that area already visited or have too much demand or when they arrived to depot
+        # Mask nodes that area already visited or have too much demand or when they arrived to depot
         mask_loc = (visited_loc == 1) | (exceeds_cap[:, None, :]) \
             | ((self.i > 0) & self.from_depot[:, None, :])
-        
+
         # We can choose depot if we are not in depot OR all nodes are visited
         # equivalent to: we mask the depot if we are in it AND there're still mode nodes to visit 
         mask_depot = self.from_depot[:, None, :] & ((mask_loc == False).sum(dim=-1, keepdims=True) > 0)
 
-        return torch.cat([mask_depot, mask_loc], dim=-1)
+        mask_loc = torch.cat([mask_depot, mask_loc], dim=-1)
+
+        if self.neighborhood_mask is not None:
+            mask_knn = self.neighborhood_mask[torch.arange(self.neighborhood_mask.size(0)), self.prev_a.squeeze(1)][:, None, :]
+            mask_loc = mask_loc | mask_knn
+
+        return mask_loc
 
     def step(self, action):
 
@@ -109,6 +124,37 @@ class AgentVRP():
         self.visited[self.ids, [0], action] = 1
         
         self.i += 1
+
+    def set_neighborhood_mask(self, attention_neighborhood=20):
+
+        # 1/True means don't attend
+
+        # get distance matrix
+        mask = torch.cdist(self.coords, self.coords, p=2)
+        # get location of top k items not including depot
+        _, idx = mask[:, 1:, 1:].topk(attention_neighborhood)
+        _, idx_depot = mask[:, 0, :].topk(attention_neighborhood)
+        # shift the indices by 1 because depot
+        idx = idx + 1
+        #add depot which has access to its nearest nodes
+        idx = torch.cat([idx, idx_depot[:, None, :]], dim=1)
+
+        # set all to 1 (disallow all)
+        ones = torch.ones_like(mask)
+        # set neighborhood to zero (allow)
+        mask_new = ones.scatter(-1, idx, 0)
+
+        # depot node can access all TODO: is this important?
+        mask_new[:, 0, :] = 0
+        # depot should always be accessible by all
+        mask_new[:, :, 0] = 0
+
+        # make bool
+        mask_new = mask_new == 1
+
+        self.neighborhood_mask = mask_new
+
+        return mask
 
     @staticmethod
     def get_costs(dataset, pi):

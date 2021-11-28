@@ -8,7 +8,10 @@ from attention_dynamic_model import set_decode_type
 from utils import generate_data_onfly, FastTensorDataLoader, get_dev_of_mod
 
 
-def copy_of_pt_model(model, embedding_dim=128, graph_size=20):
+def copy_of_pt_model(model, embedding_dim=128, graph_size=20,
+                     attention_type=0,
+                     attention_neighborhood=0,
+                     batch_norm=False):
     """Copy model weights to new model
     """
     CAPACITIES = {10: 20.,
@@ -21,7 +24,10 @@ def copy_of_pt_model(model, embedding_dim=128, graph_size=20):
                torch.rand((2, graph_size, 2), dtype=torch.float32),
                torch.randint(low=1, high= 10, size=(2, graph_size), dtype=torch.float32)/CAPACITIES[graph_size]]
     
-    new_model = AttentionDynamicModel(embedding_dim).to(get_dev_of_mod(model))
+    new_model = AttentionDynamicModel(embedding_dim,
+                                       attention_type=attention_type,
+                                       attention_neighborhood=attention_neighborhood,
+                                       batch_norm=batch_norm).to(get_dev_of_mod(model))
     set_decode_type(new_model, "sampling")
     new_model.eval()
     with torch.no_grad():
@@ -45,7 +51,7 @@ def rollout(model, dataset, batch_size = 1000, disable_tqdm = False):
     # Evaluate model in greedy mode
     set_decode_type(model, "greedy")
 
-    train_batches = FastTensorDataLoader(dataset[0],dataset[1],dataset[2], batch_size=batch_size, shuffle=False)
+    train_batches = FastTensorDataLoader(dataset[0], dataset[1], dataset[2], batch_size=batch_size, shuffle=False)
     
     model_was_training = model.training
     model.eval()
@@ -79,7 +85,11 @@ class RolloutBaseline:
                  num_samples=10000,
                  warmup_exp_beta=0.8,
                  embedding_dim=128,
-                 graph_size=20
+                 graph_size=20,
+                 dense_mix=1.0,
+                 attention_type=0,
+                 attention_neighborhood=0,
+                 batch_norm=False
                  ):
         """
         Args:
@@ -93,6 +103,11 @@ class RolloutBaseline:
             warmup_exp_beta: warmup mixing parameter (exp. moving average parameter)
 
         """
+
+        self.dense_mix = dense_mix
+        self.attention_type = attention_type
+        self.attention_neighborhood = attention_neighborhood
+        self.batch_norm = batch_norm
 
         self.num_samples = num_samples
         self.cur_epoch = epoch
@@ -125,17 +140,24 @@ class RolloutBaseline:
             self.model = load_pt_model(self.path_to_checkpoint,
                                        embedding_dim=self.embedding_dim,
                                        graph_size=self.graph_size,
+                                       attention_type=self.attention_type,
+                                       attention_neighborhood=self.attention_neighborhood,
+                                       batch_norm=self.batch_norm,
                                        device = get_dev_of_mod(model))
             self.model.eval()
         else:
             self.model = copy_of_pt_model(model,
                                           embedding_dim=self.embedding_dim,
-                                          graph_size=self.graph_size)
+                                          graph_size=self.graph_size,
+                                          attention_type=self.attention_type,
+                                          attention_neighborhood=self.attention_neighborhood,
+                                          batch_norm=self.batch_norm
+                                          )
             self.model.eval()
             torch.save(self.model.state_dict(),'./checkpts/baseline_checkpoint_epoch_{}_{}'.format(epoch, self.filename))
         
         # We generate a new dataset for baseline model on each baseline update to prevent possible overfitting
-        self.dataset = generate_data_onfly(num_samples=self.num_samples, graph_size=self.graph_size)
+        self.dataset = generate_data_onfly(num_samples=self.num_samples, graph_size=self.graph_size, dense_mix=self.dense_mix)
 
         print(f"Evaluating baseline model on baseline dataset (epoch = {epoch})")
         self.bl_vals = rollout(self.model, self.dataset)
@@ -213,7 +235,10 @@ class RolloutBaseline:
             print(f"alpha was updated to {self.alpha}")
 
             
-def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, device='cpu'):
+def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, device='cpu',
+                 attention_type=0,
+                 attention_neighborhood=0,
+                 batch_norm=False):
     """Load model weights from hd5 file
     """
     CAPACITIES = {10: 20.,
@@ -226,7 +251,10 @@ def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, dev
                torch.rand((2, graph_size, 2), dtype=torch.float32),
                torch.randint(low=1, high= 10, size=(2, graph_size), dtype=torch.float32)/CAPACITIES[graph_size]]
 
-    model_loaded = AttentionDynamicModel(embedding_dim,n_encode_layers=n_encode_layers).to(device)
+    model_loaded = AttentionDynamicModel(embedding_dim,n_encode_layers=n_encode_layers,
+                     attention_type=attention_type,
+                     attention_neighborhood=attention_neighborhood,
+                     batch_norm=batch_norm).to(device)
 
     set_decode_type(model_loaded, "greedy")
     _, _ = model_loaded(data_random)

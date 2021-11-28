@@ -25,17 +25,18 @@ def train_model(optimizer,
                 model_torch,
                 baseline,
                 validation_dataset,
-                samples = 1280000,
-                batch = 128,
-                val_batch_size = 1000,
-                start_epoch = 0,
-                end_epoch = 5,
-                from_checkpoint = False,
-                grad_norm_clipping = 1.0,
-                batch_verbose = 1000,
-                graph_size = 20,
-                filename = None,
+                samples=1280000,
+                batch=128,
+                val_batch_size=1000,
+                start_epoch=0,
+                end_epoch=5,
+                from_checkpoint=False,
+                grad_norm_clipping=1.0,
+                batch_verbose=1000,
+                graph_size=20,
+                filename=None,
                 mem_efficient=False,
+                dense_mix=1.0
                 ):
 
     if filename is None:
@@ -84,7 +85,7 @@ def train_model(optimizer,
     for epoch in range(start_epoch, end_epoch):
 
         # Create dataset on current epoch
-        data = generate_data_onfly(num_samples=samples, graph_size=graph_size)
+        data = generate_data_onfly(num_samples=samples, graph_size=graph_size, dense_mix=dense_mix)
 
         epoch_loss_avg = IterativeMean()
         epoch_cost_avg = IterativeMean()
