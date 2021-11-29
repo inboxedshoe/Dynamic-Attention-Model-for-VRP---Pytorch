@@ -13,8 +13,8 @@ def scaled_attention(query, key, value, mask=None, attention_type=0):
     qk = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(query.shape[-1])
     if mask is not None: qk = qk.masked_fill(mask == 1, -1e9)
 
-    #qk = F.softmax(qk, dim=-1)
-    qk = entmax15(qk, dim=-1)
+    qk = F.softmax(qk, dim=-1)
+    #qk = entmax15(qk, dim=-1)
     # if attention_type == 0:
     #     qk = F.softmax(qk, dim=-1)
     # else:

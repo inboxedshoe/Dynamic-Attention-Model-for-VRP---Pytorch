@@ -29,13 +29,13 @@ batch_norm = False
 
 # additions
 attention_type = "full"
-attention_neighborhood = 0
+attention_neighborhood = 20
 dense_mix = 1.0
 
 #change cuda device id
 device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
-FILENAME = 'VRP_{}_{}'.format(GRAPH_SIZE, strftime("%Y-%m-%d", gmtime()))
+FILENAME = 'knn_20_VRP_{}_{}'.format(GRAPH_SIZE, strftime("%Y-%m-%d", gmtime()))
 
 model_pt = AttentionDynamicModel(embedding_dim,
                                  attention_type=attention_type,
