@@ -101,7 +101,7 @@ def train_model(optimizer,
 
         print("Current decode type: {}".format(model_torch.decode_type))
         
-        train_batches = FastTensorDataLoader(data[0],data[1],data[2], batch_size=batch, shuffle=False)
+        train_batches = FastTensorDataLoader(data[0], data[1], data[2], batch_size=batch, shuffle=True)
         
         for num_batch, x_batch in tqdm(enumerate(train_batches), desc="batch calculation at epoch {}".format(epoch)):
             optimizer.zero_grad()

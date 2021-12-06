@@ -67,6 +67,37 @@ def read_from_pickle(path, return_data_set=True, num_samples=None):
     else:
         return objects
 
+def read_from_old_pickle(path, return_data_set=True, num_samples=None):
+    """Read dataset from file (pickle)
+    """
+
+    objects = []
+    with (open(path, "rb")) as openfile:
+        while True:
+            try:
+                objects.append(pickle.load(openfile))
+            except EOFError:
+                break
+
+    objects = tuple(objects[0])
+    total_depo = []
+    total_graphs = []
+    total_demand = []
+
+    for i in range(len(objects)):
+        total_depo.append(objects[i][0])
+        total_graphs.append(objects[i][1])
+        total_demand.append([dem / objects[i][3] for dem in objects[i][2]])
+
+    objects = (total_depo, total_graphs, total_demand)
+    if return_data_set:
+        if num_samples is not None:
+            return (total_depo[:num_samples], total_graphs[:num_samples], total_demand[:num_samples])
+        else:
+            return (total_depo, total_graphs, total_demand)
+    else:
+        return objects
+
 
 def generate_data_onfly(num_samples=10000, graph_size=20, dense_mix=1.0):
     """Generate temp dataset in memory
@@ -78,27 +109,26 @@ def generate_data_onfly(num_samples=10000, graph_size=20, dense_mix=1.0):
         return (depo, graphs, demand)
     else:
         # we want a mixture of data densities in the training data
-        data = generate_default_density(graph_size, num_samples / 2, CAPACITIES)
-        data += generate_dense_data(graph_size, num_samples / 2, CAPACITIES, dense_mix, 100)
-        return(data["depot"], data["loc"], data["demand"])
+        depo, graphs, demand = generate_default_density(graph_size, num_samples / 2, CAPACITIES)
+        depo_temp, graphs_temp, demand_temp = generate_dense_data(graph_size, num_samples / 2, CAPACITIES, dense_mix, 100)
+
+        depo = torch.cat([depo, depo_temp], dim=0)
+        graphs = torch.cat([graphs, graphs_temp], dim=0)
+        demand = torch.cat([demand, demand_temp], dim=0)
+
+        return(depo, graphs, demand)
 
 
+def generate_default_density(size, samples, capacities):
+    samples = int(samples)
+    depo = torch.rand((samples, 2))
+    graphs = torch.rand((samples, size, 2))
+    demand = torch.randint(low=1, high=10, size=(samples, size), dtype=torch.float32) / CAPACITIES[size]
+
+    return (depo, graphs, demand)
 
 
-def generate_default_density(self, size, samples, capacities):
-    data = [
-        {
-            'loc': torch.FloatTensor(size, 2).uniform_(0, 1),
-            # Uniform 1 - 9, scaled by capacities
-            'demand': (torch.FloatTensor(size).uniform_(0, 9).int() + 1).float() / capacities[size],
-            'depot': torch.FloatTensor(2).uniform_(0, 1)
-        }
-        for i in range(int(samples))
-    ]
-    return data
-
-
-def generate_dense_data(self, size, samples, capacities, max_interval, num_distros=10, mixed=True):
+def generate_dense_data(size, samples, capacities, max_interval, num_distros=10, mixed=True):
 
     # first we need to sample multiple ranges
     start_points = []
@@ -109,37 +139,28 @@ def generate_dense_data(self, size, samples, capacities, max_interval, num_distr
         start_points.append(point.item())
 
     if samples % num_distros == 0:
-        mini_batch_size = samples / num_distros
+        mini_batch_size = int(samples / num_distros)
         # create initialmini batch
-        data = [
-            {
-                'loc': torch.FloatTensor(size, 2).uniform_(start_points[0], start_points[0] + max_interval),
-                # Uniform 1 - 9, scaled by capacities
-                'demand': (torch.FloatTensor(size).uniform_(0, 9).int() + 1).float() / capacities[size],
-                'depot': torch.FloatTensor(2).uniform_(start_points[0], start_points[0] + max_interval)
-            }
-            for i in range(int(mini_batch_size))
-        ]
+
+
+        depo = torch.FloatTensor(mini_batch_size,2).uniform_(start_points[0], start_points[0] + max_interval)
+        graphs = torch.FloatTensor(mini_batch_size, size, 2).uniform_(start_points[0], start_points[0] + max_interval)
+        demand = (torch.FloatTensor(mini_batch_size, size).uniform_(0, 9).int() + 1).float() / capacities[size]
+
         # loop over remaining minibatches
         for start_index in range(1, len(start_points)):
-            data_temp = [
-                {
-                    'loc': torch.FloatTensor(size, 2).uniform_(start_points[start_index],
-                                                               start_points[start_index] + max_interval),
-                    # Uniform 1 - 9, scaled by capacities
-                    'demand': (torch.FloatTensor(size).uniform_(0, 9).int() + 1).float() / capacities[size],
-                    'depot': torch.FloatTensor(2).uniform_(start_points[start_index],
-                                                           start_points[start_index] + max_interval)
-                }
-                for i in range(int(mini_batch_size))
-            ]
-            data += data_temp
+
+            depo = torch.cat([depo, torch.FloatTensor(mini_batch_size, 2).uniform_(start_points[start_index],
+                                                           start_points[start_index] + max_interval)], dim=0)
+            graphs = torch.cat([graphs, torch.FloatTensor(mini_batch_size, size, 2).uniform_(start_points[start_index],
+                                                               start_points[start_index] + max_interval)], dim=0)
+            demand = torch.cat([demand, (torch.FloatTensor(mini_batch_size, size).uniform_(0, 9).int() + 1).float() / capacities[size]], dim=0)
 
     else:
         print("sample size is not divisible by number of distros")
         assert (0)
 
-    return data
+    return (depo, graphs, demand)
 
 def get_results(train_loss_results, train_cost_results, val_cost, save_results=True, filename=None, plots=True):
 
