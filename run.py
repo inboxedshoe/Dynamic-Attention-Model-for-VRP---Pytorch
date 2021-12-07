@@ -24,13 +24,13 @@ BATCH_VERBOSE = 50
 VAL_BATCH_SIZE = 1000
 VALIDATE_SET_SIZE = 10000
 SEED = 1234
-GRAPH_SIZE = 20
+GRAPH_SIZE = 50
 batch_norm = False
 
 # additions
 attention_type = "full"
-attention_neighborhood = 0
-dense_mix = 0.4
+attention_neighborhood = 20
+dense_mix = 1
 
 #change cuda device id
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

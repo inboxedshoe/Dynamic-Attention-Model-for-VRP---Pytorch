@@ -132,8 +132,8 @@ class AgentVRP():
         # get distance matrix
         mask = torch.cdist(self.coords, self.coords, p=2)
         # get location of top k items not including depot
-        _, idx = mask[:, 1:, 1:].topk(attention_neighborhood)
-        _, idx_depot = mask[:, 0, :].topk(attention_neighborhood)
+        _, idx = mask[:, 1:, 1:].topk(attention_neighborhood, largest=False)
+        _, idx_depot = mask[:, 0, :].topk(attention_neighborhood, largest=False)
         # shift the indices by 1 because depot
         idx = idx + 1
         #add depot which has access to its nearest nodes
