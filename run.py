@@ -30,7 +30,7 @@ batch_norm = False
 # additions
 attention_type = "full"
 attention_neighborhood = 20
-dense_mix = 0.4
+dense_mix = 1
 
 #change cuda device id
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

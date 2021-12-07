@@ -28,6 +28,7 @@ class AgentVRP():
         self.i = torch.zeros(1, dtype=torch.int64)
 
         self.neighborhood_size = None
+        self.neighborhood_mask = None
 
     @staticmethod
     def outer_pr(a, b):
@@ -105,8 +106,9 @@ class AgentVRP():
         mask_loc = torch.cat([mask_depot, mask_loc], dim=-1)
 
         if self.neighborhood_size is not None:
-            mask_temp = self.set_neighborhood_mask(mask_loc.squeeze(1))
-            mask_knn = self.neighborhood_mask[torch.arange(self.neighborhood_mask.size(0)), self.prev_a.squeeze(1)][:, None, :]
+            # mask_temp = self.set_neighborhood_mask(mask_loc.squeeze(1))
+            mask_temp = self.neighborhood_mask
+            mask_knn = mask_temp[torch.arange(mask_temp.size(0)), self.prev_a.squeeze(1)][:, None, :]
             mask_loc = mask_loc | mask_knn
 
         return mask_loc

@@ -231,6 +231,7 @@ class AttentionDynamicModel(nn.Module):
         #tell the problem we will be using attention neighborhood during generation
         if self.attention_neighborhood > 0:
             state.neighborhood_size = self.attention_neighborhood
+            state.set_neighborhood_mask()
 
         inputs = self.set_input_device(inputs)  # sent inputs to GPU for training if it's being used
         sequences = []
