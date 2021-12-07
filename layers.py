@@ -78,9 +78,9 @@ class MultiHeadAttention(nn.Module):
         # project query, key and value to d_model dimensional space
         # this is equivalent to projecting them each to a head_depth dimensional space (for every head)
         # but with a single matrix
-        Q = self.wq(query) # (batch_size, seq_len_q, d_query) -> (batch_size, seq_len_q, d_model)
-        K = self.wk(key) # ... -> (batch_size, seq_len_k, d_model)
-        V = self.wv(value) # ... -> (batch_size, seq_len_v, d_model)
+        Q = self.wq(query)  # (batch_size, seq_len_q, d_query) -> (batch_size, seq_len_q, d_model)
+        K = self.wk(key)  # ... -> (batch_size, seq_len_k, d_model)
+        V = self.wv(value)  # ... -> (batch_size, seq_len_v, d_model)
 
         # split individual heads
         Q = self.split_heads(Q, batch_size) # ... -> (batch_size, n_heads, seq_len_q, head_depth)
@@ -94,7 +94,7 @@ class MultiHeadAttention(nn.Module):
             mask = mask.unsqueeze(1)
 
         # perform attention for each q=(seq_len_q, head_depth), k=(seq_len_k, head_depth), v=(seq_len_v, head_depth)
-        attention = scaled_attention(Q, K, V, mask, attention_type=self.attention_type) # (batch_size, n_heads, seq_len_q, head_depth)
+        attention = scaled_attention(Q, K, V, mask, attention_type=self.attention_type)  # (batch_size, n_heads, seq_len_q, head_depth)
         # transpose attention to (batch_size, seq_len_q, n_heads, head_depth)
         attention = attention.transpose(1, 2).contiguous()
         # concatenate results of all heads (batch_size, seq_len_q, self.d_model)

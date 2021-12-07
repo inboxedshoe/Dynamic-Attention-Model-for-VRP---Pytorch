@@ -27,7 +27,7 @@ class AgentVRP():
         # Step counter
         self.i = torch.zeros(1, dtype=torch.int64)
 
-        self.neighborhood_mask = None
+        self.neighborhood_size = None
 
     @staticmethod
     def outer_pr(a, b):
@@ -53,6 +53,9 @@ class AgentVRP():
 
         ones_mask = torch.ones_like(att_mask)
 
+        if self.neighborhood_size is not None:
+            neighborhood_mask = self.set_neighborhood_mask(att_mask)
+
         # Create square attention mask.
         # In a (n_nodes, n_nodes) matrix this masks all rows and columns of visited nodes
         att_mask = AgentVRP.outer_pr(att_mask, ones_mask) \
@@ -62,8 +65,8 @@ class AgentVRP():
         att_mask = att_mask == 1
 
         # if we have a neighborhood mask, apply it
-        if self.neighborhood_mask is not None:
-            att_mask = att_mask | self.neighborhood_mask
+        if self.neighborhood_size is not None:
+            att_mask = att_mask | neighborhood_mask
 
         return att_mask, cur_num_nodes
 
@@ -101,7 +104,8 @@ class AgentVRP():
 
         mask_loc = torch.cat([mask_depot, mask_loc], dim=-1)
 
-        if self.neighborhood_mask is not None:
+        if self.neighborhood_size is not None:
+            mask_temp = self.set_neighborhood_mask(mask_loc.squeeze(1))
             mask_knn = self.neighborhood_mask[torch.arange(self.neighborhood_mask.size(0)), self.prev_a.squeeze(1)][:, None, :]
             mask_loc = mask_loc | mask_knn
 
@@ -125,15 +129,18 @@ class AgentVRP():
         
         self.i += 1
 
-    def set_neighborhood_mask(self, attention_neighborhood=20):
+    def set_neighborhood_mask(self, mask_loc=None):
 
         # 1/True means don't attend
+        coords = self.coords
+        if mask_loc is not None:
+            coords = self.coords.masked_fill(mask_loc[:, :, None].repeat(1, 1, 2), 100)
 
         # get distance matrix
-        mask = torch.cdist(self.coords, self.coords, p=2)
-        # get location of top k items not including depot
-        _, idx = mask[:, 1:, 1:].topk(attention_neighborhood)
-        _, idx_depot = mask[:, 0, :].topk(attention_neighborhood)
+        mask = torch.cdist(coords, coords, p=2)
+        # get location of nearest k items not including depot
+        _, idx = mask[:, 1:, 1:].topk(self.neighborhood_size, largest=False)
+        _, idx_depot = mask[:, 0, :].topk(self.neighborhood_size, largest=False)
         # shift the indices by 1 because depot
         idx = idx + 1
         #add depot which has access to its nearest nodes
@@ -154,7 +161,7 @@ class AgentVRP():
 
         self.neighborhood_mask = mask_new
 
-        return mask
+        return mask_new
 
     @staticmethod
     def get_costs(dataset, pi):
@@ -167,6 +174,6 @@ class AgentVRP():
         # Note: first element of pi is not depot, but the first selected node in path
         # and last element from longest path is not depot
 
-        return ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1) # intra node distances
+        return ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1)  # intra node distances
             + (torch.norm(d[:, 0] - dataset[0], dim=-1))  # distance from depot to first
-            + (torch.norm(d[:, -1] - dataset[0], dim=-1))) # distance from last node of longest path to depot
+            + (torch.norm(d[:, -1] - dataset[0], dim=-1)))  # distance from last node of longest path to depot
