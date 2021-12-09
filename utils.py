@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
 import time
+import math
 
 CAPACITIES = {
         10: 20.,
@@ -99,24 +100,66 @@ def read_from_old_pickle(path, return_data_set=True, num_samples=None):
         return objects
 
 
-def generate_data_onfly(num_samples=10000, graph_size=20, dense_mix=1.0):
+def generate_data_onfly(num_samples=10000, graph_size=20, dense_mix=1.0, extra_sizes=None):
     """Generate temp dataset in memory
+
+        inputs:
+        num_samples: total number of data samples to generate
+        graph_size: largest graph size in the training set
+        dense_mix: compresses half of the training data by a specific density factor
+        extra_size: creates multiple data graph sizes with equal sample portions
+        for the smaller graph sizes y
+        currently a combination of dense mix and extra size is not implemented
     """
-    if dense_mix == 1.0:
-        depo = torch.rand((num_samples, 2))
-        graphs = torch.rand((num_samples, graph_size, 2))
-        demand = torch.randint(low=1, high=10, size=(num_samples, graph_size), dtype=torch.float32) / CAPACITIES[graph_size]
-        return (depo, graphs, demand)
+    if extra_sizes is None:
+        if dense_mix == 1.0:
+            depo = torch.rand((num_samples, 2))
+            graphs = torch.rand((num_samples, graph_size, 2))
+            demand = torch.randint(low=1, high=10, size=(num_samples, graph_size), dtype=torch.float32) / CAPACITIES[graph_size]
+            return (depo, graphs, demand)
+        else:
+            # we want a mixture of data densities in the training data
+            depo, graphs, demand = generate_default_density(graph_size, num_samples / 2, CAPACITIES)
+            depo_temp, graphs_temp, demand_temp = generate_dense_data(graph_size, num_samples / 2, CAPACITIES, dense_mix, 100)
+
+            depo = torch.cat([depo, depo_temp], dim=0)
+            graphs = torch.cat([graphs, graphs_temp], dim=0)
+            demand = torch.cat([demand, demand_temp], dim=0)
     else:
-        # we want a mixture of data densities in the training data
-        depo, graphs, demand = generate_default_density(graph_size, num_samples / 2, CAPACITIES)
-        depo_temp, graphs_temp, demand_temp = generate_dense_data(graph_size, num_samples / 2, CAPACITIES, dense_mix, 100)
+        num_graphs_sizes = len(extra_sizes) + 1
+        num_samples_per_extras = math.floor(num_samples/num_graphs_sizes)
+        num_samples_original = num_samples - len(extra_sizes)*num_samples_per_extras
 
-        depo = torch.cat([depo, depo_temp], dim=0)
-        graphs = torch.cat([graphs, graphs_temp], dim=0)
-        demand = torch.cat([demand, demand_temp], dim=0)
+        # the depo and demand tensors don't change
+        depo = torch.rand((num_samples, 2))
+        # demand tensor size is based on the biggest graph size since they wont be considered anyways
+        demand = torch.randint(low=1, high=10, size=(num_samples, graph_size), dtype=torch.float32) / CAPACITIES[graph_size]
 
-        return(depo, graphs, demand)
+        # create the original data graphs first
+        g_size = torch.tensor([graph_size])[None, None, :]
+        g_size = g_size.repeat(num_samples_original, 1, 2)
+        graphs = torch.rand((num_samples_original, graph_size, 2))
+        graphs = torch.cat([g_size, graphs], dim=-2)
+
+        for size in extra_sizes:
+
+            # create the temporary subgraph
+            graph_extra_temp = torch.rand((num_samples_per_extras, size, 2))
+
+            # repeat the first element to fill the remaining required size
+            repeat_vector = torch.ones(size, dtype=torch.int)
+            repeat_vector[0] = graph_size - size + 1
+            graph_extra_temp = torch.repeat_interleave(graph_extra_temp, repeat_vector, dim=-2)
+
+            # add the graph size indicator
+            g_size = torch.tensor([size])[None, None, :]
+            g_size = g_size.repeat(num_samples_per_extras, 1, 2)
+            graph_extra_temp = torch.cat([g_size, graph_extra_temp], dim=-2)
+
+            #add to total graphs
+            graphs = torch.cat([graphs, graph_extra_temp], dim=0)
+
+    return(depo, graphs, demand)
 
 
 def generate_default_density(size, samples, capacities):

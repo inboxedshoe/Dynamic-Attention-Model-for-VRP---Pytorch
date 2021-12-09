@@ -226,7 +226,10 @@ class AttentionDynamicModel(nn.Module):
 
         self.batch_size = inputs[0].shape[0]
 
-        state = self.problem(inputs) # use CPU inputs for state
+        state = self.problem(inputs)  # use CPU inputs for state
+
+        if state.graph_sizes is not None:
+            inputs = self.remove_graph_tag(inputs)
 
         #tell the problem we will be using attention neighborhood during generation
         if self.attention_neighborhood > 0:
@@ -297,3 +300,6 @@ class AttentionDynamicModel(nn.Module):
     def set_input_device(self, inp_tens):
         if self.dev is None: self.dev = get_dev_of_mod(self)
         return(inp_tens[0].to(self.dev), inp_tens[1].to(self.dev), inp_tens[2].to(self.dev))
+
+    def remove_graph_tag(self, inp):
+        return (inp[0], inp[1][:,1:,:], inp[2])

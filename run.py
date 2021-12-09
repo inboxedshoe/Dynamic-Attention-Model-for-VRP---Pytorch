@@ -29,8 +29,9 @@ batch_norm = False
 
 # additions
 attention_type = "full"
-attention_neighborhood = 20
+attention_neighborhood = 0
 dense_mix = 1
+extra_sizes = [20]
 
 #change cuda device id
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -69,7 +70,8 @@ baseline = RolloutBaseline(model_pt,
                            dense_mix=dense_mix,
                            attention_type=attention_type,
                            attention_neighborhood=attention_neighborhood,
-                           batch_norm=batch_norm
+                           batch_norm=batch_norm,
+                           extra_sizes=extra_sizes
                            )
 print(get_cur_time(), 'baseline initialized')
 
@@ -90,5 +92,6 @@ train_model(optimizer,
             batch_verbose=BATCH_VERBOSE,
             graph_size=GRAPH_SIZE,
             filename=FILENAME,
-            dense_mix=dense_mix
+            dense_mix=dense_mix,
+            extra_sizes=extra_sizes
             )

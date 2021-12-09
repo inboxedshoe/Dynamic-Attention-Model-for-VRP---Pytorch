@@ -89,7 +89,8 @@ class RolloutBaseline:
                  dense_mix=1.0,
                  attention_type=0,
                  attention_neighborhood=0,
-                 batch_norm=False
+                 batch_norm=False,
+                 extra_sizes=None
                  ):
         """
         Args:
@@ -105,6 +106,8 @@ class RolloutBaseline:
         """
 
         self.dense_mix = dense_mix
+        self.extra_sizes = extra_sizes
+
         self.attention_type = attention_type
         self.attention_neighborhood = attention_neighborhood
         self.batch_norm = batch_norm
@@ -157,7 +160,7 @@ class RolloutBaseline:
             torch.save(self.model.state_dict(),'./checkpts/baseline_checkpoint_epoch_{}_{}'.format(epoch, self.filename))
         
         # We generate a new dataset for baseline model on each baseline update to prevent possible overfitting
-        self.dataset = generate_data_onfly(num_samples=self.num_samples, graph_size=self.graph_size, dense_mix=self.dense_mix)
+        self.dataset = generate_data_onfly(num_samples=self.num_samples, graph_size=self.graph_size, dense_mix=self.dense_mix, extra_sizes=self.extra_sizes)
 
         print(f"Evaluating baseline model on baseline dataset (epoch = {epoch})")
         self.bl_vals = rollout(self.model, self.dataset)

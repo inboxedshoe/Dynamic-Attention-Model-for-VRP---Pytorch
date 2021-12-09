@@ -36,7 +36,8 @@ def train_model(optimizer,
                 graph_size=20,
                 filename=None,
                 mem_efficient=False,
-                dense_mix=1.0
+                dense_mix=1.0,
+                extra_sizes=None
                 ):
 
     if filename is None:
@@ -85,7 +86,7 @@ def train_model(optimizer,
     for epoch in range(start_epoch, end_epoch):
 
         # Create dataset on current epoch
-        data = generate_data_onfly(num_samples=samples, graph_size=graph_size, dense_mix=dense_mix)
+        data = generate_data_onfly(num_samples=samples, graph_size=graph_size, dense_mix=dense_mix, extra_sizes=extra_sizes)
 
         epoch_loss_avg = IterativeMean()
         epoch_cost_avg = IterativeMean()
