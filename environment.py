@@ -35,10 +35,12 @@ class AgentVRP():
         # instantly mark the dummy nodes as already visited
         if self.graph_sizes is not None:
             # all points up to this will be marked as visited already
-            cut_off = (max(self.graph_sizes) - self.graph_sizes).to(torch.long)
+            cut_off = (max(self.graph_sizes) - self.graph_sizes + 1).to(torch.long)
+            cut_off[cut_off == 1] = 0
             cut_off_mask = torch.zeros(self.visited.shape[0], self.visited.shape[2] + 1)
             cut_off_mask[(torch.arange(self.visited.shape[0]),  cut_off)] = 1
             cut_off_mask = (1 - cut_off_mask.cumsum(dim=1)[:, :-1]).to(torch.bool)  # remove the superfluous column
+            cut_off_mask[:, 0] = False
             self.visited = self.visited.masked_fill(cut_off_mask[:, None, :], 1)  # use mask to zero after each column
 
         # Step counter

@@ -290,7 +290,7 @@ class AttentionDynamicModel(nn.Module):
                 # torch.cuda.empty_cache()    
             # torch.cuda.empty_cache()
 
-        pi = torch.stack(sequences, dim=1) # (batch_size, len(outputs))
+        pi = torch.stack(sequences, dim=1)  # (batch_size, len(outputs))
         cost = self.problem.get_costs((inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu()), pi)
 
         ret = [cost, ll]
