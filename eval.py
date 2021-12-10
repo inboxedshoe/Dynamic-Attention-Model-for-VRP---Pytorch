@@ -33,6 +33,7 @@ model = load_pt_model(MODEL_PATH,
                          attention_type=0,
                          attention_neighborhood=0,
                          batch_norm=False,
+                         size_context=False,
                          device='cuda:1')
 
 set_decode_type(model, "sampling")

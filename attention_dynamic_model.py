@@ -22,7 +22,8 @@ class AttentionDynamicModel(nn.Module):
                  tanh_clipping=10.,
                  attention_type="full",
                  attention_neighborhood=0,
-                 batch_norm=False
+                 batch_norm=False,
+                 size_context=False
                  ):
         
         super().__init__()
@@ -38,6 +39,7 @@ class AttentionDynamicModel(nn.Module):
                                "sparsemax": 2}.get(attention_type, 0)
 
         self.attention_neighborhood = attention_neighborhood
+        self.size_context = size_context
 
         # attributes for VRP problem
         self.problem = AgentVRP
@@ -67,7 +69,13 @@ class AttentionDynamicModel(nn.Module):
 
         # we split projection matrix Wq into 2 matrices: Wq*[h_c, h_N, D] = Wq_context*h_c + Wq_step_context[h_N, D]
         self.wq_context = nn.Linear(self.embedding_dim, self.output_dim)  # (d_q_context, output_dim)
-        self.wq_step_context = nn.Linear(self.embedding_dim + 1, self.output_dim, bias=False)  # (d_q_step_context, output_dim)
+
+        if size_context:
+            self.wq_step_context = nn.Linear(self.embedding_dim + 2, self.output_dim, bias=False)  # (d_q_step_context, output_dim)
+        else:
+            # need to add the graph size to the context if it is taken into consideration
+            self.wq_step_context = nn.Linear(self.embedding_dim + 1, self.output_dim,
+                                             bias=False)  # (d_q_step_context, output_dim)
 
         # we need two Wk projections since there is MHA followed by 1-head attention - they have different keys K
         self.wk = nn.Linear(self.embedding_dim, self.output_dim, bias=False)  # (d_k, output_dim)
@@ -125,6 +133,16 @@ class AttentionDynamicModel(nn.Module):
 
         # add remaining capacity
         step_context = torch.cat([cur_embedded_node, (self.problem.VEHICLE_CAPACITY - state.used_capacity[:, :, None]).to(self.dev)], dim=-1)
+
+        if self.size_context:
+            if state.graph_sizes is not None:
+                # add the problem size as context
+                step_context = torch.cat([step_context, state.graph_sizes[:, None, None].to(device=step_context.device)], dim=-1)
+            else:
+                # if the data doesn't include the problem sizes then we will assume it is homogeneous
+                # and we only use the immediate problem size
+                empty_context = torch.ones((state.batch_size, 1, 1), device=step_context.device)
+                step_context = torch.cat([step_context, empty_context.fill_(state.n_loc)], dim=-1)
 
         return step_context  # (batch_size, 1, input_dim + 1)
 

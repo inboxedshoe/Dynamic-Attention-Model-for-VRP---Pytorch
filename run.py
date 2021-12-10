@@ -32,6 +32,7 @@ attention_type = "full"
 attention_neighborhood = 0
 dense_mix = 1
 extra_sizes = [20]
+size_context = True
 
 #change cuda device id
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -41,7 +42,8 @@ FILENAME = 'dense04_20_VRP_full_{}_{}'.format(GRAPH_SIZE, strftime("%Y-%m-%d", g
 model_pt = AttentionDynamicModel(embedding_dim,
                                  attention_type=attention_type,
                                  attention_neighborhood=attention_neighborhood,
-                                 batch_norm=batch_norm).to(device)
+                                 batch_norm=batch_norm,
+                                 size_context=size_context).to(device)
 
 set_decode_type(model_pt, "sampling")
 print(get_cur_time(), 'model initialized')
@@ -71,7 +73,8 @@ baseline = RolloutBaseline(model_pt,
                            attention_type=attention_type,
                            attention_neighborhood=attention_neighborhood,
                            batch_norm=batch_norm,
-                           extra_sizes=extra_sizes
+                           extra_sizes=extra_sizes,
+                           size_context=size_context
                            )
 print(get_cur_time(), 'baseline initialized')
 

@@ -11,7 +11,8 @@ from utils import generate_data_onfly, FastTensorDataLoader, get_dev_of_mod
 def copy_of_pt_model(model, embedding_dim=128, graph_size=20,
                      attention_type=0,
                      attention_neighborhood=0,
-                     batch_norm=False):
+                     batch_norm=False,
+                     size_context=False):
     """Copy model weights to new model
     """
     CAPACITIES = {10: 20.,
@@ -22,12 +23,13 @@ def copy_of_pt_model(model, embedding_dim=128, graph_size=20,
 
     data_random = [torch.rand((2, 2,), dtype=torch.float32),
                torch.rand((2, graph_size, 2), dtype=torch.float32),
-               torch.randint(low=1, high= 10, size=(2, graph_size), dtype=torch.float32)/CAPACITIES[graph_size]]
+               torch.randint(low=1, high=10, size=(2, graph_size), dtype=torch.float32)/CAPACITIES[graph_size]]
     
     new_model = AttentionDynamicModel(embedding_dim,
                                        attention_type=attention_type,
                                        attention_neighborhood=attention_neighborhood,
-                                       batch_norm=batch_norm).to(get_dev_of_mod(model))
+                                       batch_norm=batch_norm,
+                                       size_context=size_context).to(get_dev_of_mod(model))
     set_decode_type(new_model, "sampling")
     new_model.eval()
     with torch.no_grad():
@@ -90,7 +92,8 @@ class RolloutBaseline:
                  attention_type=0,
                  attention_neighborhood=0,
                  batch_norm=False,
-                 extra_sizes=None
+                 extra_sizes=None,
+                 size_context=False
                  ):
         """
         Args:
@@ -107,6 +110,7 @@ class RolloutBaseline:
 
         self.dense_mix = dense_mix
         self.extra_sizes = extra_sizes
+        self.size_context = size_context
 
         self.attention_type = attention_type
         self.attention_neighborhood = attention_neighborhood
@@ -146,7 +150,8 @@ class RolloutBaseline:
                                        attention_type=self.attention_type,
                                        attention_neighborhood=self.attention_neighborhood,
                                        batch_norm=self.batch_norm,
-                                       device = get_dev_of_mod(model))
+                                       size_context=self.size_context,
+                                       device=get_dev_of_mod(model))
             self.model.eval()
         else:
             self.model = copy_of_pt_model(model,
@@ -154,7 +159,8 @@ class RolloutBaseline:
                                           graph_size=self.graph_size,
                                           attention_type=self.attention_type,
                                           attention_neighborhood=self.attention_neighborhood,
-                                          batch_norm=self.batch_norm
+                                          batch_norm=self.batch_norm,
+                                          size_context=self.size_context
                                           )
             self.model.eval()
             torch.save(self.model.state_dict(),'./checkpts/baseline_checkpoint_epoch_{}_{}'.format(epoch, self.filename))
@@ -241,7 +247,8 @@ class RolloutBaseline:
 def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, device='cpu',
                  attention_type=0,
                  attention_neighborhood=0,
-                 batch_norm=False):
+                 batch_norm=False,
+                 size_context=False):
     """Load model weights from hd5 file
     """
     CAPACITIES = {10: 20.,
@@ -257,7 +264,8 @@ def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, dev
     model_loaded = AttentionDynamicModel(embedding_dim,n_encode_layers=n_encode_layers,
                      attention_type=attention_type,
                      attention_neighborhood=attention_neighborhood,
-                     batch_norm=batch_norm).to(device)
+                     batch_norm=batch_norm,
+                     size_context=size_context).to(device)
 
     set_decode_type(model_loaded, "greedy")
     _, _ = model_loaded(data_random)
