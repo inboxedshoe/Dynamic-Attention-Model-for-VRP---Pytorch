@@ -35,7 +35,7 @@ class AgentVRP():
         # instantly mark the dummy nodes as already visited
         if self.graph_sizes is not None:
             # all points up to this will be marked as visited already
-            cut_off = (max(self.graph_sizes) - self.graph_sizes + 1).to(torch.long)
+            cut_off = (self.demand.shape[-1] - self.graph_sizes + 1).to(torch.long)
             cut_off[cut_off == 1] = 0
             cut_off_mask = torch.zeros(self.visited.shape[0], self.visited.shape[2] + 1)
             cut_off_mask[(torch.arange(self.visited.shape[0]),  cut_off)] = 1
@@ -185,7 +185,7 @@ class AgentVRP():
         return mask_new
 
     @staticmethod
-    def get_costs(dataset, pi):
+    def get_costs( dataset, pi, graph_sizes=None):
         
         # Place nodes with coordinates in order of decoder tour
         loc_with_depot = torch.cat((dataset[0][:, None, :], dataset[1]), dim=1) # (batch_size, n_nodes, 2)
@@ -194,7 +194,13 @@ class AgentVRP():
         # Calculation of total distance
         # Note: first element of pi is not depot, but the first selected node in path
         # and last element from longest path is not depot
-
-        return ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1)  # intra node distances
-            + (torch.norm(d[:, 0] - dataset[0], dim=-1))  # distance from depot to first
-            + (torch.norm(d[:, -1] - dataset[0], dim=-1)))  # distance from last node of longest path to depot
+        if graph_sizes is None:
+            return ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1)  # intra node distances
+                + (torch.norm(d[:, 0] - dataset[0], dim=-1))  # distance from depot to first
+                + (torch.norm(d[:, -1] - dataset[0], dim=-1)))  # distance from last node of longest path to depot
+        else:
+            costs = ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1)  # intra node distances
+                + (torch.norm(d[:, 0] - dataset[0], dim=-1))  # distance from depot to first
+                + (torch.norm(d[:, -1] - dataset[0], dim=-1)))  # distance from last node of longest path to depot
+            normalized_costs = torch.div(costs, graph_sizes)
+            return normalized_costs

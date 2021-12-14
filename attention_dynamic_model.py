@@ -32,6 +32,7 @@ class AttentionDynamicModel(nn.Module):
         self.embedding_dim = embedding_dim
         self.n_encode_layers = n_encode_layers
         self.decode_type = None
+        self.normalize_costs = True
 
         # new additions
         self.attention_type = {"full": 0,
@@ -309,7 +310,14 @@ class AttentionDynamicModel(nn.Module):
             # torch.cuda.empty_cache()
 
         pi = torch.stack(sequences, dim=1)  # (batch_size, len(outputs))
-        cost = self.problem.get_costs((inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu()), pi)
+
+        #check if costs should be normalized
+        if self.normalize_costs:
+            cost = self.problem.get_costs((inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu())
+                                          , pi, graph_sizes=state.graph_sizes)
+        else:
+            cost = self.problem.get_costs(
+                (inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu()), pi)
 
         ret = [cost, ll]
         if return_pi: ret.append(pi)

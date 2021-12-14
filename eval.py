@@ -14,8 +14,8 @@ embedding_dim = 128
 GRAPH_SIZE = 50
 val_batch_size = 1000
 
-MODEL_PATH = 'checkpts/model_checkpoint_epoch_44_dense04_20_VRP_full_20_2021-12-01'
-VAL_SET_PATH = 'data/CVRP/vrp50_test_seed1234.pkl'
+MODEL_PATH = 'C:/Users/inbox/Desktop/Results/model_checkpoint_epoch_82_50-20_sizeContexted_full_50_2021-12-10'
+VAL_SET_PATH = 'data/CVRP/vrp20_test_seed1234.pkl'
 
 #path_2 = "valsets/Validation_dataset_VRP_20_2021-11-28.pkl"
 # Create and save validation dataset
@@ -33,8 +33,8 @@ model = load_pt_model(MODEL_PATH,
                          attention_type=0,
                          attention_neighborhood=0,
                          batch_norm=False,
-                         size_context=False,
-                         device='cuda:1')
+                         size_context=True,
+                         device='cuda:0')
 
 set_decode_type(model, "sampling")
 print(get_cur_time(), 'model loaded')

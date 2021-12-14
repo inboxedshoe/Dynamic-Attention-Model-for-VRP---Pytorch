@@ -270,6 +270,6 @@ def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, dev
     set_decode_type(model_loaded, "greedy")
     _, _ = model_loaded(data_random)
 
-    model_loaded.load_state_dict(torch.load(path))
+    model_loaded.load_state_dict(torch.load(path, map_location=device))
 
     return model_loaded

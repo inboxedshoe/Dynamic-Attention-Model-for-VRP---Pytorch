@@ -32,7 +32,7 @@ attention_type = "full"
 attention_neighborhood = 0
 dense_mix = 1
 extra_sizes = [20]
-size_context = True
+size_context = False
 
 #change cuda device id
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
