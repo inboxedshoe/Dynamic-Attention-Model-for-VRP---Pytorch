@@ -269,7 +269,14 @@ class AttentionDynamicModel(nn.Module):
             att_mask, cur_num_nodes = state.get_att_mask()
             att_mask, cur_num_nodes = att_mask.to(self.dev), cur_num_nodes.to(self.dev)
             embeddings, context_vectors = self.embedder(inputs, att_mask, cur_num_nodes)
-            K_tanh, Q_context, K, V = self.get_projections(embeddings, context_vectors)
+
+            masked_embeddings = embeddings.clone()
+            masked_embeddings[(state.visited.squeeze(1) == False).to(device="cuda:0")] = 0
+
+            masked_embeddings[:, :, 0] = embeddings[:, :, 0]
+            new_context_vectors = torch.sum(masked_embeddings, 1) / cur_num_nodes
+
+            K_tanh, Q_context, K, V = self.get_projections(embeddings, new_context_vectors)
 
             while not state.partial_finished():
 
