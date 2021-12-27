@@ -30,8 +30,8 @@ batch_norm = False
 # additions
 attention_type = "full"
 attention_neighborhood = 0
-dense_mix = 1
-extra_sizes = [20]
+dense_mix = 1.0
+extra_sizes = None
 size_context = False
 normalize_cost = False
 save_extras = False
