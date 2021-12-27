@@ -12,7 +12,9 @@ def copy_of_pt_model(model, embedding_dim=128, graph_size=20,
                      attention_type=0,
                      attention_neighborhood=0,
                      batch_norm=False,
-                     size_context=False):
+                     size_context=False,
+                 normalize_cost=False,
+                 save_extras=False):
     """Copy model weights to new model
     """
     CAPACITIES = {10: 20.,
@@ -29,7 +31,9 @@ def copy_of_pt_model(model, embedding_dim=128, graph_size=20,
                                        attention_type=attention_type,
                                        attention_neighborhood=attention_neighborhood,
                                        batch_norm=batch_norm,
-                                       size_context=size_context).to(get_dev_of_mod(model))
+                                       size_context=size_context,
+                                         normalize_cost=normalize_cost,
+                                         save_extras=save_extras).to(get_dev_of_mod(model))
     set_decode_type(new_model, "sampling")
     new_model.eval()
     with torch.no_grad():
@@ -41,15 +45,22 @@ def copy_of_pt_model(model, embedding_dim=128, graph_size=20,
 
     return new_model
 
-def get_costs_rollout(model, train_batches, disable_tqdm):
+
+def get_costs_rollout(model, train_batches, disable_tqdm, save_extras_path=None):
     costs_list = []
     for batch in tqdm(train_batches, disable=disable_tqdm, desc="Rollout greedy execution"):
-        cost, _ = model(batch)
-        costs_list.append(cost)
+        if save_extras_path:
+            cost, _, extras = model(batch)
+            costs_list.append(cost)
+            torch.save(extras, save_extras_path)
+        else:
+            cost, _ = model(batch)
+            costs_list.append(cost)
         # torch.cuda.empty_cache()
     return costs_list
 
-def rollout(model, dataset, batch_size = 1000, disable_tqdm = False):
+
+def rollout(model, dataset, batch_size = 1000, disable_tqdm = False, save_extras_path=None):
     # Evaluate model in greedy mode
     set_decode_type(model, "greedy")
 
@@ -59,18 +70,18 @@ def rollout(model, dataset, batch_size = 1000, disable_tqdm = False):
     model.eval()
 
     with torch.no_grad():
-        costs_list = get_costs_rollout(model, train_batches, disable_tqdm)
+        costs_list = get_costs_rollout(model, train_batches, disable_tqdm, save_extras_path=save_extras_path)
 
     if model_was_training: model.train() # restore original model training state
 
     return torch.cat(costs_list, dim=0)
 
 
-def validate(dataset, model, batch_size=1000):
+def validate(dataset, model, batch_size=1000, save_extras_path=None):
     """Validates model on given dataset in greedy mode
     """
     # rollout will set the model to eval mode and turn it back to it's original mode after it finishes
-    val_costs = rollout(model, dataset, batch_size=batch_size)
+    val_costs = rollout(model, dataset, batch_size=batch_size, save_extras_path=save_extras_path)
     set_decode_type(model, "sampling")
     mean_cost = torch.mean(val_costs)
     print(f"Validation score: {np.round(mean_cost, 4)}")
@@ -93,7 +104,9 @@ class RolloutBaseline:
                  attention_neighborhood=0,
                  batch_norm=False,
                  extra_sizes=None,
-                 size_context=False
+                 size_context=False,
+                 normalize_cost=False,
+                 save_extras=False
                  ):
         """
         Args:
@@ -111,6 +124,9 @@ class RolloutBaseline:
         self.dense_mix = dense_mix
         self.extra_sizes = extra_sizes
         self.size_context = size_context
+
+        self.normalize_cost = normalize_cost
+        self.save_extras = save_extras
 
         self.attention_type = attention_type
         self.attention_neighborhood = attention_neighborhood
@@ -151,6 +167,8 @@ class RolloutBaseline:
                                        attention_neighborhood=self.attention_neighborhood,
                                        batch_norm=self.batch_norm,
                                        size_context=self.size_context,
+                                       normalize_cost=self.normalize_cost,
+                                       save_extras=self.save_extras,
                                        device=get_dev_of_mod(model))
             self.model.eval()
         else:
@@ -160,7 +178,9 @@ class RolloutBaseline:
                                           attention_type=self.attention_type,
                                           attention_neighborhood=self.attention_neighborhood,
                                           batch_norm=self.batch_norm,
-                                          size_context=self.size_context
+                                          size_context=self.size_context,
+                                          normalize_cost=self.normalize_cost,
+                                          save_extras=self.save_extras
                                           )
             self.model.eval()
             torch.save(self.model.state_dict(),'./checkpts/baseline_checkpoint_epoch_{}_{}'.format(epoch, self.filename))
@@ -248,7 +268,9 @@ def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, dev
                  attention_type=0,
                  attention_neighborhood=0,
                  batch_norm=False,
-                 size_context=False):
+                 size_context=False,
+                 normalize_cost=False,
+                 save_extras=False):
     """Load model weights from hd5 file
     """
     CAPACITIES = {10: 20.,
@@ -265,7 +287,9 @@ def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, dev
                      attention_type=attention_type,
                      attention_neighborhood=attention_neighborhood,
                      batch_norm=batch_norm,
-                     size_context=size_context).to(device)
+                     size_context=size_context,
+                     normalize_cost=normalize_cost,
+                     save_extras=save_extras).to(device)
 
     set_decode_type(model_loaded, "greedy")
     _, _ = model_loaded(data_random)

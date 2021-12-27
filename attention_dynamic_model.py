@@ -23,7 +23,9 @@ class AttentionDynamicModel(nn.Module):
                  attention_type="full",
                  attention_neighborhood=0,
                  batch_norm=False,
-                 size_context=False
+                 size_context=False,
+                 normalize_cost=False,
+                 save_extras=False
                  ):
         
         super().__init__()
@@ -32,7 +34,9 @@ class AttentionDynamicModel(nn.Module):
         self.embedding_dim = embedding_dim
         self.n_encode_layers = n_encode_layers
         self.decode_type = None
-        self.normalize_costs = True
+        self.normalize_costs = normalize_cost
+
+        self.save_extras = save_extras
 
         # new additions
         self.attention_type = {"full": 0,
@@ -263,6 +267,9 @@ class AttentionDynamicModel(nn.Module):
             pre_selects = pre_selects.transpose(0, 1)
         # Perform decoding steps
         pre_select_idx = 0
+
+        decoded_logs = []
+
         while not state.all_finished():
 
             state.i = torch.zeros(1, dtype=torch.int64)
@@ -296,6 +303,9 @@ class AttentionDynamicModel(nn.Module):
                 # compute probabilities
                 log_p = self.get_log_p(mha, K_tanh, mask)  # (batch_size, 1, n_nodes)
 
+                if self.save_extras:
+                    decoded_logs.append(log_p)
+
                 # next step is to select node
                 if pre_selects is None:
                     selected = self._select_node(log_p.detach())  # (batch_size,)
@@ -327,7 +337,10 @@ class AttentionDynamicModel(nn.Module):
                 (inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu()), pi)
 
         ret = [cost, ll]
+
         if return_pi: ret.append(pi)
+        if self.save_extras: ret.append(torch.tensor(decoded_logs))
+
         return ret
 
     def set_input_device(self, inp_tens):

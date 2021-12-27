@@ -33,6 +33,8 @@ attention_neighborhood = 0
 dense_mix = 1
 extra_sizes = [20]
 size_context = False
+normalize_cost = False
+save_extras = False
 
 #change cuda device id
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -43,7 +45,9 @@ model_pt = AttentionDynamicModel(embedding_dim,
                                  attention_type=attention_type,
                                  attention_neighborhood=attention_neighborhood,
                                  batch_norm=batch_norm,
-                                 size_context=size_context).to(device)
+                                 size_context=size_context,
+                                 normalize_cost=normalize_cost,
+                                 save_extras=save_extras).to(device)
 
 set_decode_type(model_pt, "sampling")
 print(get_cur_time(), 'model initialized')
@@ -74,7 +78,9 @@ baseline = RolloutBaseline(model_pt,
                            attention_neighborhood=attention_neighborhood,
                            batch_norm=batch_norm,
                            extra_sizes=extra_sizes,
-                           size_context=size_context
+                           size_context=size_context,
+                           normalize_cost=normalize_cost,
+                           save_extras=save_extras
                            )
 print(get_cur_time(), 'baseline initialized')
 

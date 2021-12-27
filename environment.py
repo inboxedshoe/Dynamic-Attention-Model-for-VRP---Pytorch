@@ -69,7 +69,7 @@ class AgentVRP():
         # Number of nodes in new instance after masking
         cur_num_nodes = self.n_loc + 1 - att_mask.sum(dim=1, keepdims=True)  # (batch_size, 1)
 
-        att_mask = torch.cat((torch.zeros(att_mask.shape[0], 1), att_mask), dim=-1) # add depot -> (batch_size, n_nodes)
+        att_mask = torch.cat((torch.zeros(att_mask.shape[0], 1), att_mask), dim=-1)  # add depot -> (batch_size, n_nodes)
 
         ones_mask = torch.ones_like(att_mask)
 
@@ -185,7 +185,7 @@ class AgentVRP():
         return mask_new
 
     @staticmethod
-    def get_costs( dataset, pi, graph_sizes=None):
+    def get_costs(dataset, pi, graph_sizes=None):
         
         # Place nodes with coordinates in order of decoder tour
         loc_with_depot = torch.cat((dataset[0][:, None, :], dataset[1]), dim=1) # (batch_size, n_nodes, 2)
