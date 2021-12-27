@@ -2,9 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from entmax import entmax15, sparsemax
 
-def scaled_attention(query, key, value, mask=None, attention_type=0):
+def scaled_attention(query, key, value, mask=None):
     """ Function that performs scaled attention given q, k, v and mask.
     q, k, v can have multiple batches and heads, defined across the first dimensions
     and the last 2 dimensions for a given sample of them are in row vector format.
@@ -12,18 +11,7 @@ def scaled_attention(query, key, value, mask=None, attention_type=0):
     """
     qk = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(query.shape[-1])
     if mask is not None: qk = qk.masked_fill(mask == 1, -1e9)
-
     qk = F.softmax(qk, dim=-1)
-    #qk = entmax15(qk, dim=-1)
-    # if attention_type == 0:
-    #     qk = F.softmax(qk, dim=-1)
-    # else:
-    #     if attention_type == 1:
-    #         qk = entmax15(qk, dim=-1)
-    #     else:
-    #         if attention_type == 2:
-    #             qk = sparsemax(qk, dim=-1)
-
     return torch.matmul(qk, value)
 
 class MultiHeadAttention(nn.Module):
@@ -47,14 +35,12 @@ class MultiHeadAttention(nn.Module):
         Returns:
               attention outputs of shape (batch_size, seq_len_q, d_model)
     """
-    def __init__(self, n_heads, d_model, attention_type=0, **kwargs):
+    def __init__(self, n_heads, d_model, **kwargs):
         super(MultiHeadAttention, self).__init__()
         self.n_heads, self.d_model = n_heads, d_model
         self.head_depth = self.d_model // self.n_heads
         
         assert self.d_model % self.n_heads == 0
-
-        self.attention_type = attention_type
 
         # define weight matrices
         self.wq = nn.Linear(self.d_model, self.d_model, bias=False)
@@ -78,9 +64,9 @@ class MultiHeadAttention(nn.Module):
         # project query, key and value to d_model dimensional space
         # this is equivalent to projecting them each to a head_depth dimensional space (for every head)
         # but with a single matrix
-        Q = self.wq(query)  # (batch_size, seq_len_q, d_query) -> (batch_size, seq_len_q, d_model)
-        K = self.wk(key)  # ... -> (batch_size, seq_len_k, d_model)
-        V = self.wv(value)  # ... -> (batch_size, seq_len_v, d_model)
+        Q = self.wq(query) # (batch_size, seq_len_q, d_query) -> (batch_size, seq_len_q, d_model)
+        K = self.wk(key) # ... -> (batch_size, seq_len_k, d_model)
+        V = self.wv(value) # ... -> (batch_size, seq_len_v, d_model)
 
         # split individual heads
         Q = self.split_heads(Q, batch_size) # ... -> (batch_size, n_heads, seq_len_q, head_depth)
@@ -94,14 +80,14 @@ class MultiHeadAttention(nn.Module):
             mask = mask.unsqueeze(1)
 
         # perform attention for each q=(seq_len_q, head_depth), k=(seq_len_k, head_depth), v=(seq_len_v, head_depth)
-        attention = scaled_attention(Q, K, V, mask, attention_type=self.attention_type)  # (batch_size, n_heads, seq_len_q, head_depth)
+        attention = scaled_attention(Q, K, V, mask) # (batch_size, n_heads, seq_len_q, head_depth)
         # transpose attention to (batch_size, seq_len_q, n_heads, head_depth)
         attention = attention.transpose(1, 2).contiguous()
         # concatenate results of all heads (batch_size, seq_len_q, self.d_model)
         attention = attention.view(batch_size, -1, self.d_model)
 
         # project attention to same dimension; observe this is equivalent to summing individual projection
-        # as suggested in paper
-        output = self.w_out(attention)  # (batch_size, seq_len_q, d_model)
+        # as sugested in paper
+        output = self.w_out(attention) # (batch_size, seq_len_q, d_model)
 
         return output

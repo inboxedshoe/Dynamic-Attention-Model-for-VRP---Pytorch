@@ -53,9 +53,7 @@ class AttentionDynamicModel(nn.Module):
         # Encoder part
         self.embedder = GraphAttentionEncoder(input_dim=self.embedding_dim,
                                               num_heads=self.n_heads,
-                                              num_layers=self.n_encode_layers,
-                                              attention_type=attention_type,
-                                              batch_norm=batch_norm
+                                              num_layers=self.n_encode_layers
                                               )
 
         # Decoder part
@@ -168,7 +166,7 @@ class AttentionDynamicModel(nn.Module):
         if mask is not None:
             mask = mask.unsqueeze(1)
 
-        attention = scaled_attention(Q, K, V, mask, attention_type=self.attention_type)  # self.attention_type) # (batch_size, n_heads, seq_len_q, head_depth)
+        attention = scaled_attention(Q, K, V, mask)  # self.attention_type) # (batch_size, n_heads, seq_len_q, head_depth)
         # transpose attention to (batch_size, seq_len_q, n_heads, head_depth)
         attention = attention.transpose(1, 2).contiguous()
         # concatenate results of all heads (batch_size, seq_len_q, self.output_dim)
