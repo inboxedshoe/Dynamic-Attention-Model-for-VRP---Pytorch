@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from entmax import entmax15
 
 def scaled_attention(query, key, value, mask=None):
     """ Function that performs scaled attention given q, k, v and mask.
@@ -11,7 +12,8 @@ def scaled_attention(query, key, value, mask=None):
     """
     qk = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(query.shape[-1])
     if mask is not None: qk = qk.masked_fill(mask == 1, -1e9)
-    qk = F.softmax(qk, dim=-1)
+    #qk = F.softmax(qk, dim=-1)
+    qk = entmax15(qk, dim=-1)
     return torch.matmul(qk, value)
 
 class MultiHeadAttention(nn.Module):

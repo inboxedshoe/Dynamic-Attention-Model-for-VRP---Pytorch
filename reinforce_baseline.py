@@ -60,11 +60,14 @@ def get_costs_rollout(model, train_batches, disable_tqdm, save_extras_path=None)
     return costs_list
 
 
-def rollout(model, dataset, batch_size = 1000, disable_tqdm = False, save_extras_path=None):
+def rollout(model, dataset, batch_size = 1000, disable_tqdm = False, save_extras_path=None, train_batch=None):
     # Evaluate model in greedy mode
     set_decode_type(model, "greedy")
 
-    train_batches = FastTensorDataLoader(dataset[0], dataset[1], dataset[2], batch_size=batch_size, shuffle=False)
+    if train_batch:
+        train_batches = train_batch
+    else:
+        train_batches = FastTensorDataLoader(dataset[0], dataset[1], dataset[2], batch_size=batch_size, shuffle=False)
     
     model_was_training = model.training
     model.eval()
@@ -222,14 +225,14 @@ class RolloutBaseline:
         # Combination of baseline cost and exp. moving average cost
         return self.alpha * v_b.detach() + (1 - self.alpha) * v_ema.detach()
 
-    def eval_all(self, dataset):
+    def eval_all(self, dataset, train_batch=None):
         """Evaluates current baseline model on the whole dataset only for non warm-up epochs
         """
 
         if self.alpha < 1:
             return None
 
-        val_costs = rollout(self.model, dataset, batch_size=2048)
+        val_costs = rollout(self.model, dataset, batch_size=2048, train_batch=train_batch)
 
         return val_costs
 

@@ -7,7 +7,7 @@ from reinforce_baseline import validate
 
 from utils import generate_data_onfly, get_results, get_cur_time
 from time import gmtime, strftime
-from utils import FastTensorDataLoader, get_dev_of_mod
+from utils import FastTensorDataLoader, get_dev_of_mod, generate_data_onfly_batched
 
 class IterativeMean():
     def __init__(self):
@@ -37,7 +37,8 @@ def train_model(optimizer,
                 filename=None,
                 mem_efficient=False,
                 dense_mix=1.0,
-                extra_sizes=None
+                extra_sizes=None,
+                extra_batched=False
                 ):
 
     if filename is None:
@@ -86,7 +87,10 @@ def train_model(optimizer,
     for epoch in range(start_epoch, end_epoch):
 
         # Create dataset on current epoch
-        data = generate_data_onfly(num_samples=samples, graph_size=graph_size, dense_mix=dense_mix, extra_sizes=extra_sizes)
+        if extra_batched:
+            data = generate_data_onfly_batched(num_samples=samples, graph_sizes=extra_sizes.insert(0, graph_size))
+        else:
+            data = generate_data_onfly(num_samples=samples, graph_size=graph_size, dense_mix=dense_mix, extra_sizes=extra_sizes)
 
         epoch_loss_avg = IterativeMean()
         epoch_cost_avg = IterativeMean()
@@ -96,13 +100,13 @@ def train_model(optimizer,
             print('Skipping warm-up mode')
             baseline.alpha = 1.0
 
+        train_batches = FastTensorDataLoader(data[0], data[1], data[2], batch_size=batch, shuffle=False)
+
         # If epoch > wp_n_epochs then precompute baseline values for the whole dataset else None
-        bl_vals = baseline.eval_all(data)  # (samples, ) or None
+        bl_vals = baseline.eval_all(data, train_batches)  # (samples, ) or None
         bl_vals = torch.reshape(bl_vals, (-1, batch)) if bl_vals is not None else None # (n_batches, batch) or None
 
         print("Current decode type: {}".format(model_torch.decode_type))
-        
-        train_batches = FastTensorDataLoader(data[0], data[1], data[2], batch_size=batch, shuffle=False)
         
         for num_batch, x_batch in tqdm(enumerate(train_batches), desc="batch calculation at epoch {}".format(epoch)):
             optimizer.zero_grad()

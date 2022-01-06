@@ -162,6 +162,34 @@ def generate_data_onfly(num_samples=10000, graph_size=20, dense_mix=1.0, extra_s
     return(depo, graphs, demand)
 
 
+def generate_data_onfly_batched(num_samples=10000, graph_sizes=[20]):
+    """Generate temp dataset in memory
+
+        inputs:
+        num_samples: total number of data samples to generate
+        graph_size: largest graph size in the training set
+        dense_mix: compresses half of the training data by a specific density factor
+        extra_size: creates multiple data graph sizes with equal sample portions
+        for the smaller graph sizes y
+        currently a combination of dense mix and extra size is not implemented
+    """
+    num_graphs_sizes = len(graph_sizes) + 1
+    num_samples_per_size = math.floor(num_samples / num_graphs_sizes)
+
+    total_data = []
+
+    for graph_size in graph_sizes:
+
+        # the depo and demand tensors don't change
+        depo = torch.rand((num_samples_per_size, 2))
+        # demand tensor size is based on the biggest graph size since they wont be considered anyways
+        demand = torch.randint(low=1, high=10, size=(num_samples_per_size, graph_size), dtype=torch.float32) / CAPACITIES[graph_size]
+        graphs = torch.rand((num_samples_per_size, graph_size, 2))
+
+        total_data.append((depo, graphs, demand))
+
+    return total_data
+
 def generate_default_density(size, samples, capacities):
     samples = int(samples)
     depo = torch.rand((samples, 2))
@@ -250,7 +278,7 @@ class FastTensorDataLoader:
         """
         assert all(t.shape[0] == tensors[0].shape[0] for t in tensors)
         self.tensors = tensors
-
+        #####################################change here################################################
         self.dataset_len = self.tensors[0].shape[0]
         self.batch_size = batch_size
         self.shuffle = shuffle
