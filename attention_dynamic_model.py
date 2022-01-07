@@ -89,7 +89,7 @@ class AttentionDynamicModel(nn.Module):
 
         # we dont need wq for 1-head tanh attention, since we can absorb it into w_out
         self.w_out = nn.Linear(self.embedding_dim, self.output_dim, bias=False)  # (d_model, d_model)
-
+        self.alpha = torch.tensor(1.33, requires_grad=True)
         self.dev = None
 
     def set_decode_type(self, decode_type):
@@ -166,7 +166,9 @@ class AttentionDynamicModel(nn.Module):
         if mask is not None:
             mask = mask.unsqueeze(1)
 
-        attention = scaled_attention(Q, K, V, mask)  # self.attention_type) # (batch_size, n_heads, seq_len_q, head_depth)
+        self.alpha = self.alpha.to(device=Q.device)
+
+        attention = scaled_attention(Q, K, V, mask, alpha=self.alpha)  # self.attention_type) # (batch_size, n_heads, seq_len_q, head_depth)
         # transpose attention to (batch_size, seq_len_q, n_heads, head_depth)
         attention = attention.transpose(1, 2).contiguous()
         # concatenate results of all heads (batch_size, seq_len_q, self.output_dim)

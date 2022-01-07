@@ -14,7 +14,8 @@ def scaled_attention(query, key, value, mask=None, alpha=None):
     if mask is not None: qk = qk.masked_fill(mask == 1, -1e9)
     #qk = F.softmax(qk, dim=-1)
     #qk = entmax15(qk, dim=-1)
-    qk = entmax_bisect(qk, alpha, dim=-1)
+    qk = entmax_bisect(qk, alpha, ensure_sum_one=False)
+    #print(qk[0])
     return torch.matmul(qk, value)
 
 class MultiHeadAttention(nn.Module):
@@ -51,7 +52,7 @@ class MultiHeadAttention(nn.Module):
         self.wv = nn.Linear(self.d_model, self.d_model, bias=False)
         
         self.w_out = nn.Linear(self.d_model, self.d_model, bias=False)
-        self.alpha = torch.tensor(1.5, requires_grad=True)
+        self.alpha = torch.tensor(1.33, requires_grad=True)
 
     def split_heads(self, tensor, batch_size):
         """ Function that splits the heads. This happens in the same tensor since this class doesn't
@@ -82,6 +83,8 @@ class MultiHeadAttention(nn.Module):
         # (batch_size, seq_len_q, seq_len_k) --> (batch_size, 1, seq_len_q, seq_len_k)
         if mask is not None:
             mask = mask.unsqueeze(1)
+
+        self.alpha = self.alpha.to(device=Q.device)
 
         # perform attention for each q=(seq_len_q, head_depth), k=(seq_len_k, head_depth), v=(seq_len_v, head_depth)
         attention = scaled_attention(Q, K, V, mask, alpha=self.alpha) # (batch_size, n_heads, seq_len_q, head_depth)
