@@ -260,6 +260,59 @@ def get_results(train_loss_results, train_cost_results, val_cost, save_results=T
         plt.savefig('learning_curve_plot_{}.jpg'.format(filename))
         plt.show()
 
+class CustomFastTensorDataLoader:
+    """
+    A DataLoader-like object for a set of tensors that can be much faster than
+    TensorDataset + DataLoader because dataloader grabs individual indices of
+    the dataset and calls cat (slow).
+    Source: https://discuss.pytorch.org/t/dataloader-much-slower-than-manual-batching/27014/6
+    """
+    def __init__(self, data, batch_size=32, shuffle=False):
+        """
+        Initialize a FastTensorDataLoader.
+        :param *tensors: tensors to store. Must have the same length @ dim 0.
+        :param batch_size: batch size to load.
+        :param shuffle: if True, shuffle the data *in-place* whenever an
+            iterator is created out of this object.
+        :returns: A FastTensorDataLoader.
+        """
+        #assert all(t.shape[0] == tensors[0].shape[0] for t in tensors)
+        self.data = data
+        #####################################change here################################################
+        self.dataset_len = np.zeros(len(data))
+        for set, index in enumerate(data):
+            self.dataset_len[index] += self.set[0].shape[0]
+
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+
+        # Calculate # batches per dataset
+        n_batches, remainder = divmod(self.data[0][0].shape[0], self.batch_size)
+        if remainder > 0:
+            n_batches += 1
+        # total number of batches
+        self.n_batches = n_batches * len(data)
+
+    def __iter__(self):
+        # if self.shuffle:
+        #     r = torch.randperm(self.dataset_len)
+        #     self.tensors = [t[r] for t in self.tensors]
+        self.i = np.zeros(len(self.data))
+        self.j = 0
+        return self
+
+    def __next__(self):
+        max_j = len(self.data)
+
+        if self.i[self.j] >= self.dataset_len:
+            raise StopIteration
+        batch = tuple(t[self.i:self.i+self.batch_size] for t in self.tensors)
+        self.i += self.batch_size
+        return batch
+
+    def __len__(self):
+        return self.n_batches
+
 class FastTensorDataLoader:
     """
     A DataLoader-like object for a set of tensors that can be much faster than
@@ -290,8 +343,8 @@ class FastTensorDataLoader:
         self.n_batches = n_batches
     def __iter__(self):
         if self.shuffle:
-            r = torch.randperm(self.dataset_len)
-            self.tensors = [t[r] for t in self.tensors]
+            r = torch.randperm(self.tensors[0].shape[0])
+            self.tensors = [t[r].view(t.shape()) for t in self.tensors]
         self.i = 0
         return self
 

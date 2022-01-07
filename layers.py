@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from entmax import entmax15
+from entmax import entmax15, entmax_bisect
 
-def scaled_attention(query, key, value, mask=None):
+def scaled_attention(query, key, value, mask=None, alpha=None):
     """ Function that performs scaled attention given q, k, v and mask.
     q, k, v can have multiple batches and heads, defined across the first dimensions
     and the last 2 dimensions for a given sample of them are in row vector format.
@@ -13,12 +13,13 @@ def scaled_attention(query, key, value, mask=None):
     qk = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(query.shape[-1])
     if mask is not None: qk = qk.masked_fill(mask == 1, -1e9)
     #qk = F.softmax(qk, dim=-1)
-    qk = entmax15(qk, dim=-1)
+    #qk = entmax15(qk, dim=-1)
+    qk = entmax_bisect(qk, alpha, dim=-1)
     return torch.matmul(qk, value)
 
 class MultiHeadAttention(nn.Module):
     """ Attention Layer - multi-head scaled dot product attention (for encoder and decoder)
-        Observation: This MHA is currently implemented to only support singe-gpu machines
+        Observation: This MHA is currently implemented to only support single-gpu machines
 
         Args:
             num_heads: number of attention heads which will be computed in parallel
@@ -50,6 +51,7 @@ class MultiHeadAttention(nn.Module):
         self.wv = nn.Linear(self.d_model, self.d_model, bias=False)
         
         self.w_out = nn.Linear(self.d_model, self.d_model, bias=False)
+        self.alpha = torch.tensor(1.5, requires_grad=True)
 
     def split_heads(self, tensor, batch_size):
         """ Function that splits the heads. This happens in the same tensor since this class doesn't
@@ -82,7 +84,7 @@ class MultiHeadAttention(nn.Module):
             mask = mask.unsqueeze(1)
 
         # perform attention for each q=(seq_len_q, head_depth), k=(seq_len_k, head_depth), v=(seq_len_v, head_depth)
-        attention = scaled_attention(Q, K, V, mask) # (batch_size, n_heads, seq_len_q, head_depth)
+        attention = scaled_attention(Q, K, V, mask, alpha=self.alpha) # (batch_size, n_heads, seq_len_q, head_depth)
         # transpose attention to (batch_size, seq_len_q, n_heads, head_depth)
         attention = attention.transpose(1, 2).contiguous()
         # concatenate results of all heads (batch_size, seq_len_q, self.d_model)
