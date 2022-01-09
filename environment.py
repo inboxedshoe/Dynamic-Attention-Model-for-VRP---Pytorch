@@ -185,7 +185,7 @@ class AgentVRP():
         return mask_new
 
     @staticmethod
-    def get_costs(dataset, pi, graph_sizes=None):
+    def get_costs(dataset, pi, graph_sizes=None, normalize=False):
         
         # Place nodes with coordinates in order of decoder tour
         loc_with_depot = torch.cat((dataset[0][:, None, :], dataset[1]), dim=1) # (batch_size, n_nodes, 2)
@@ -195,9 +195,15 @@ class AgentVRP():
         # Note: first element of pi is not depot, but the first selected node in path
         # and last element from longest path is not depot
         if graph_sizes is None:
-            return ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1)  # intra node distances
-                + (torch.norm(d[:, 0] - dataset[0], dim=-1))  # distance from depot to first
-                + (torch.norm(d[:, -1] - dataset[0], dim=-1)))  # distance from last node of longest path to depot
+            if normalize:
+                costs = ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1)  # intra node distances
+                    + (torch.norm(d[:, 0] - dataset[0], dim=-1))  # distance from depot to first
+                    + (torch.norm(d[:, -1] - dataset[0], dim=-1)))  # distance from last node of longest path to depot
+                return costs/dataset[1].shape[1]
+            else:
+                return ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1)  # intra node distances
+                    + (torch.norm(d[:, 0] - dataset[0], dim=-1))  # distance from depot to first
+                    + (torch.norm(d[:, -1] - dataset[0], dim=-1)))  # distance from last node of longest path to depot
         else:
             costs = ((torch.norm(d[:, 1:] - d[:, :-1], dim=-1)).sum(dim=-1)  # intra node distances
                 + (torch.norm(d[:, 0] - dataset[0], dim=-1))  # distance from depot to first

@@ -328,8 +328,12 @@ class AttentionDynamicModel(nn.Module):
 
         #check if costs should be normalized
         if self.normalize_costs:
-            cost = self.problem.get_costs((inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu())
-                                          , pi, graph_sizes=state.graph_sizes)
+            if state.graph_sizes:
+                cost = self.problem.get_costs((inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu())
+                                              , pi, graph_sizes=state.graph_sizes)
+            else:
+                cost = self.problem.get_costs(
+                    (inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu()), pi, normalize=True)
         else:
             cost = self.problem.get_costs(
                 (inputs[0].detach().cpu(), inputs[1].detach().cpu(), inputs[2].detach().cpu()), pi)
