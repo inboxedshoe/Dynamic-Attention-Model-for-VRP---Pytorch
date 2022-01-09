@@ -173,18 +173,23 @@ def generate_data_onfly_batched(num_samples=10000, graph_sizes=[20]):
         for the smaller graph sizes y
         currently a combination of dense mix and extra size is not implemented
     """
-    num_graphs_sizes = len(graph_sizes) + 1
+    num_graphs_sizes = len(graph_sizes)
     num_samples_per_size = math.floor(num_samples / num_graphs_sizes)
 
     total_data = []
 
-    for graph_size in graph_sizes:
+    for i, graph_size in enumerate(graph_sizes):
+
+        if i == 0:
+            samples_size = num_samples_per_size + (num_samples % num_graphs_sizes)
+        else:
+            samples_size = num_samples_per_size
 
         # the depo and demand tensors don't change
-        depo = torch.rand((num_samples_per_size, 2))
+        depo = torch.rand((samples_size, 2))
         # demand tensor size is based on the biggest graph size since they wont be considered anyways
-        demand = torch.randint(low=1, high=10, size=(num_samples_per_size, graph_size), dtype=torch.float32) / CAPACITIES[graph_size]
-        graphs = torch.rand((num_samples_per_size, graph_size, 2))
+        demand = torch.randint(low=1, high=10, size=(samples_size, graph_size), dtype=torch.float32) / CAPACITIES[graph_size]
+        graphs = torch.rand((samples_size, graph_size, 2))
 
         total_data.append((depo, graphs, demand))
 
@@ -259,6 +264,70 @@ def get_results(train_loss_results, train_cost_results, val_cost, save_results=T
         ax2.grid(True)
         plt.savefig('learning_curve_plot_{}.jpg'.format(filename))
         plt.show()
+
+class CustomFastTensorDataLoader:
+    """
+    A DataLoader-like object for a set of tensors that can be much faster than
+    TensorDataset + DataLoader because dataloader grabs individual indices of
+    the dataset and calls cat (slow).
+    Source: https://discuss.pytorch.org/t/dataloader-much-slower-than-manual-batching/27014/6
+    """
+    def __init__(self, data, batch_size=32, shuffle=False):
+        """
+        Initialize a FastTensorDataLoader.
+        :param *tensors: tensors to store. Must have the same length @ dim 0.
+        :param batch_size: batch size to load.
+        :param shuffle: if True, shuffle the data *in-place* whenever an
+            iterator is created out of this object.
+        :returns: A FastTensorDataLoader.
+        """
+        #assert all(t.shape[0] == tensors[0].shape[0] for t in tensors)
+        self.data = data
+        #####################################change here################################################
+        self.dataset_len = np.zeros(len(data))
+        for index, dataset in enumerate(data):
+            self.dataset_len[index] += dataset[0].shape[0]
+
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+
+        # Calculate # batches per dataset
+        n_batches, remainder = divmod(self.data[0][0].shape[0], self.batch_size)
+        if remainder > 0:
+            n_batches += 1
+        # total number of batches
+        self.n_batches = n_batches * len(data)
+
+    def __iter__(self):
+        # if self.shuffle:
+        #     r = torch.randperm(self.dataset_len)
+        #     self.tensors = [t[r] for t in self.tensors]
+        self.i = 0
+        self.j = 0
+        return self
+
+    def __next__(self):
+        max_j = len(self.data) - 1
+
+        if max_j < self.j:
+            self.j = 0
+
+        # we're assuming that we alternate the problem sizes -> we can use the same i as a tracker
+        if self.i >= self.dataset_len[self.j]:
+            raise StopIteration
+
+        # we select which dataset we wanna use and create a batch tuple with coords, depot, and demands
+        batch = tuple(dataset_part[self.i:self.i+self.batch_size] for dataset_part in self.data[self.j])
+
+        # only update i after we've taken a batch from every problem size
+        if self.j == max_j:
+            self.i += self.batch_size
+
+        self.j += 1
+        return batch
+
+    def __len__(self):
+        return self.n_batches
 
 class FastTensorDataLoader:
     """

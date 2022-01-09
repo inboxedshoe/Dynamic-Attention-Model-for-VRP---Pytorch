@@ -10,7 +10,7 @@ from utils import create_data_on_disk, get_cur_time
 
 
 # Params of model
-SAMPLES = 128*10000 #512# 128*10000
+SAMPLES = 128*100 #512# 128*10000
 BATCH = 128
 START_EPOCH = 0
 END_EPOCH = 100
@@ -28,18 +28,21 @@ GRAPH_SIZE = 50
 batch_norm = False
 
 # additions
-attention_type = "full"
+attention_type = "entmax"
 attention_neighborhood = 0
 dense_mix = 1.0
-extra_sizes = None
+extra_sizes = [20]
+extra_batched = True
 size_context = False
-normalize_cost = False
+normalize_cost = True
 save_extras = False
+
 
 #change cuda device id
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-FILENAME = 'dense04_20_VRP_full_{}_{}'.format(GRAPH_SIZE, strftime("%Y-%m-%d", gmtime()))
+FILENAME = 'entmax_originalEncoder_{}_{}'.format(GRAPH_SIZE, strftime("%Y-%m-%d", gmtime()))
+
 
 model_pt = AttentionDynamicModel(embedding_dim,
                                  attention_type=attention_type,
@@ -80,7 +83,8 @@ baseline = RolloutBaseline(model_pt,
                            extra_sizes=extra_sizes,
                            size_context=size_context,
                            normalize_cost=normalize_cost,
-                           save_extras=save_extras
+                           save_extras=save_extras,
+                           extra_batched=extra_batched
                            )
 print(get_cur_time(), 'baseline initialized')
 
@@ -102,5 +106,6 @@ train_model(optimizer,
             graph_size=GRAPH_SIZE,
             filename=FILENAME,
             dense_mix=dense_mix,
-            extra_sizes=extra_sizes
+            extra_sizes=extra_sizes,
+            extra_batched=extra_batched
             )

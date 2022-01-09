@@ -5,7 +5,7 @@ import numpy as np
 
 from attention_dynamic_model import AttentionDynamicModel
 from attention_dynamic_model import set_decode_type
-from utils import generate_data_onfly, FastTensorDataLoader, get_dev_of_mod
+from utils import generate_data_onfly, FastTensorDataLoader, get_dev_of_mod, generate_data_onfly_batched, CustomFastTensorDataLoader
 
 
 def copy_of_pt_model(model, embedding_dim=128, graph_size=20,
@@ -60,14 +60,17 @@ def get_costs_rollout(model, train_batches, disable_tqdm, save_extras_path=None)
     return costs_list
 
 
-def rollout(model, dataset, batch_size = 1000, disable_tqdm = False, save_extras_path=None, train_batch=None):
+def rollout(model, dataset, batch_size = 1000, disable_tqdm = False, save_extras_path=None, train_batch=None, extra_batched=False):
     # Evaluate model in greedy mode
     set_decode_type(model, "greedy")
 
     if train_batch:
         train_batches = train_batch
     else:
-        train_batches = FastTensorDataLoader(dataset[0], dataset[1], dataset[2], batch_size=batch_size, shuffle=False)
+        if extra_batched:
+            train_batches = CustomFastTensorDataLoader(dataset, batch_size=batch_size, shuffle=False)
+        else:
+            train_batches = FastTensorDataLoader(dataset[0], dataset[1], dataset[2], batch_size=batch_size, shuffle=False)
     
     model_was_training = model.training
     model.eval()
@@ -75,7 +78,7 @@ def rollout(model, dataset, batch_size = 1000, disable_tqdm = False, save_extras
     with torch.no_grad():
         costs_list = get_costs_rollout(model, train_batches, disable_tqdm, save_extras_path=save_extras_path)
 
-    if model_was_training: model.train() # restore original model training state
+    if model_was_training: model.train()  # restore original model training state
 
     return torch.cat(costs_list, dim=0)
 
@@ -109,7 +112,8 @@ class RolloutBaseline:
                  extra_sizes=None,
                  size_context=False,
                  normalize_cost=False,
-                 save_extras=False
+                 save_extras=False,
+                 extra_batched=False
                  ):
         """
         Args:
@@ -154,9 +158,9 @@ class RolloutBaseline:
         self.embedding_dim = embedding_dim
         self.graph_size = graph_size
 
+        self.extra_batched = extra_batched
         # create and evaluate initial baseline
         self._update_baseline(model, epoch)
-
 
     def _update_baseline(self, model, epoch):
 
@@ -189,10 +193,15 @@ class RolloutBaseline:
             torch.save(self.model.state_dict(),'./checkpts/baseline_checkpoint_epoch_{}_{}'.format(epoch, self.filename))
         
         # We generate a new dataset for baseline model on each baseline update to prevent possible overfitting
-        self.dataset = generate_data_onfly(num_samples=self.num_samples, graph_size=self.graph_size, dense_mix=self.dense_mix, extra_sizes=self.extra_sizes)
+        #self.dataset = generate_data_onfly(num_samples=self.num_samples, graph_size=self.graph_size, dense_mix=self.dense_mix, extra_sizes=self.extra_sizes)
+
+        if self.extra_batched:
+            self.dataset = generate_data_onfly_batched(num_samples=self.num_samples, graph_sizes=self.extra_sizes)
+        else:
+            self.dataset = generate_data_onfly(num_samples=self.num_samples, graph_size=self.graph_size, dense_mix=self.dense_mix, extra_sizes=self.extra_sizes)
 
         print(f"Evaluating baseline model on baseline dataset (epoch = {epoch})")
-        self.bl_vals = rollout(self.model, self.dataset)
+        self.bl_vals = rollout(self.model, self.dataset, extra_batched=self.extra_batched)
         self.mean = torch.mean(self.bl_vals)
         self.cur_epoch = epoch
 
@@ -225,25 +234,26 @@ class RolloutBaseline:
         # Combination of baseline cost and exp. moving average cost
         return self.alpha * v_b.detach() + (1 - self.alpha) * v_ema.detach()
 
-    def eval_all(self, dataset, train_batch=None):
+    def eval_all(self, dataset, train_batch=None, extra_batched= False):
         """Evaluates current baseline model on the whole dataset only for non warm-up epochs
         """
 
         if self.alpha < 1:
             return None
 
-        val_costs = rollout(self.model, dataset, batch_size=2048, train_batch=train_batch)
+        val_costs = rollout(self.model, dataset, batch_size=2048, train_batch=train_batch, extra_batched=extra_batched)
 
         return val_costs
 
-    def epoch_callback(self, model, epoch):
+    def epoch_callback(self, model, epoch, extra_batched=False):
         """Compares current baseline model with the training model and updates baseline if it is improved
         """
 
         self.cur_epoch = epoch
 
         print(f"Evaluating candidate model on baseline dataset (callback epoch = {self.cur_epoch})")
-        candidate_vals = rollout(model, self.dataset)  # costs for training model on baseline dataset
+
+        candidate_vals = rollout(model, self.dataset, extra_batched=extra_batched)  # costs for training model on baseline dataset
         candidate_mean = torch.mean(candidate_vals)
 
         diff = candidate_mean - self.mean

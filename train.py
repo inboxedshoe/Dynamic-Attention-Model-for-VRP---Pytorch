@@ -7,7 +7,7 @@ from reinforce_baseline import validate
 
 from utils import generate_data_onfly, get_results, get_cur_time
 from time import gmtime, strftime
-from utils import FastTensorDataLoader, get_dev_of_mod, generate_data_onfly_batched
+from utils import FastTensorDataLoader, get_dev_of_mod, generate_data_onfly_batched, CustomFastTensorDataLoader
 
 class IterativeMean():
     def __init__(self):
@@ -82,15 +82,17 @@ def train_model(optimizer,
     train_loss_results = []
     train_cost_results = []
     val_cost_avg = []
-
+    extra_sizes.insert(0, graph_size)
     # Training loop
     for epoch in range(start_epoch, end_epoch):
 
         # Create dataset on current epoch
         if extra_batched:
-            data = generate_data_onfly_batched(num_samples=samples, graph_sizes=extra_sizes.insert(0, graph_size))
+            data = generate_data_onfly_batched(num_samples=samples, graph_sizes=extra_sizes)
+            train_batches = CustomFastTensorDataLoader(data, batch_size=batch, shuffle=False)
         else:
             data = generate_data_onfly(num_samples=samples, graph_size=graph_size, dense_mix=dense_mix, extra_sizes=extra_sizes)
+            train_batches = FastTensorDataLoader(data[0], data[1], data[2], batch_size=batch, shuffle=False)
 
         epoch_loss_avg = IterativeMean()
         epoch_cost_avg = IterativeMean()
@@ -100,11 +102,10 @@ def train_model(optimizer,
             print('Skipping warm-up mode')
             baseline.alpha = 1.0
 
-        train_batches = FastTensorDataLoader(data[0], data[1], data[2], batch_size=batch, shuffle=False)
 
         # If epoch > wp_n_epochs then precompute baseline values for the whole dataset else None
         bl_vals = baseline.eval_all(data, train_batches)  # (samples, ) or None
-        bl_vals = torch.reshape(bl_vals, (-1, batch)) if bl_vals is not None else None # (n_batches, batch) or None
+        bl_vals = torch.reshape(bl_vals, (-1, batch)) if bl_vals is not None else None  # (n_batches, batch) or None
 
         print("Current decode type: {}".format(model_torch.decode_type))
         
@@ -133,7 +134,7 @@ def train_model(optimizer,
                 print("Epoch {} (batch = {}): Loss: {}: Cost: {}".format(epoch, num_batch, epoch_loss_avg.result(), epoch_cost_avg.result()))
 
         # Update baseline if the candidate model is good enough. In this case also create new baseline dataset
-        baseline.epoch_callback(model_torch, epoch)
+        baseline.epoch_callback(model_torch, epoch, extra_batched=extra_batched)
         set_decode_type(model_torch, "sampling")
 
         # Save model weights
