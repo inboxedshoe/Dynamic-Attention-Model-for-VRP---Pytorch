@@ -82,7 +82,8 @@ def train_model(optimizer,
     train_loss_results = []
     train_cost_results = []
     val_cost_avg = []
-    extra_sizes.insert(0, graph_size)
+    if extra_batched:
+        extra_sizes.insert(0, graph_size)
     # Training loop
     for epoch in range(start_epoch, end_epoch):
 

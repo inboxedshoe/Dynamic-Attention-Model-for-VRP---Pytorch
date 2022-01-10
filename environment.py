@@ -7,12 +7,14 @@ class AgentVRP():
         depot = input[0]  # (batch_size, 2)
 
         # the first element of the coordinates actually carries the
-        if input[1][0, 0, 0] > 1:
-            self.graph_sizes = input[1][:, 0, 0]  # (batch_size, 1)
-            loc = input[1][:, 1:, :]  # (batch_size, n_nodes, 2)
-        else:
-            loc = input[1]
-            self.graph_sizes = None
+        # if input[1][0, 0, 0] > 1:
+        #     self.graph_sizes = input[1][:, 0, 0]  # (batch_size, 1)
+        #     loc = input[1][:, 1:, :]  # (batch_size, n_nodes, 2)
+        # else:
+        #     loc = input[1]
+        #     self.graph_sizes = None
+        loc = input[1]
+        self.graph_sizes = None
 
         self.demand = input[2]  # (batch_size, n_nodes)
 
@@ -159,13 +161,15 @@ class AgentVRP():
 
         # get distance matrix
         mask = torch.cdist(coords, coords, p=2)
-        # get location of nearest k items not including depot
-        _, idx = mask[:, 1:, 1:].topk(self.neighborhood_size, largest=False)
-        _, idx_depot = mask[:, 0, :].topk(self.neighborhood_size, largest=False)
-        # shift the indices by 1 because depot
-        idx = idx + 1
-        #add depot which has access to its nearest nodes
-        idx = torch.cat([idx, idx_depot[:, None, :]], dim=1)
+        # # get location of nearest k items not including depot
+        # _, idx = mask[:, 1:, 1:].topk(self.neighborhood_size, largest=False)
+        # _, idx_depot = mask[:, 0, :].topk(self.neighborhood_size, largest=False)
+        # # shift the indices by 1 because depot
+        # idx = idx + 1
+        # #add depot which has access to its nearest nodes
+        # idx = torch.cat([idx, idx_depot[:, None, :]], dim=1)
+
+        _, idx = mask[:, :, :].topk(self.neighborhood_size, largest=False)
 
         # set all to 1 (disallow all)
         ones = torch.ones_like(mask)
