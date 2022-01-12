@@ -20,6 +20,13 @@ class AgentVRP():
 
         self.batch_size, self.n_loc, _ = loc.shape
 
+        #############################   POMO    ######################################################
+        self.pomo_size = 20
+        self.selected_count = 0
+        self.BATCH_IDX = torch.arange(self.batch_size)[:, None].expand(self.batch_size, self.pomo_size)
+        self.POMO_IDX = torch.arange(self.pomo_size)[None, :].expand(self.batch_size, self.pomo_size)
+        ##############################################################################################
+
         # Coordinates of depot + other nodes -> (batch_size, 1+n_nodes, 2)
         self.coords = torch.cat((depot[:, None, :], loc), dim=-2)
 
@@ -27,12 +34,12 @@ class AgentVRP():
         self.ids = torch.arange(self.batch_size)  # (batch_size)
 
         # State
-        self.prev_a = torch.zeros(self.batch_size, 1, dtype=torch.int64)
+        self.prev_a = torch.zeros((self.batch_size, self.pomo_size), dtype=torch.int64)
         self.from_depot = self.prev_a == 0
-        self.used_capacity = torch.zeros(self.batch_size, 1)
+        self.used_capacity = torch.zeros((self.batch_size, self.pomo_size))
 
         # Nodes that have been visited will be marked with 1
-        self.visited = torch.zeros(self.batch_size, 1, self.n_loc+1)
+        self.visited = torch.zeros(self.batch_size, self.pomo_size, self.n_loc+1)
 
         # instantly mark the dummy nodes as already visited
         if self.graph_sizes is not None:
@@ -56,7 +63,7 @@ class AgentVRP():
         """ Outer product of a and b row vectors.
             result[k] = matmul( a[k].t(), b[k] )
         """
-        return torch.einsum('ki,kj->kij', a, b)
+        return torch.einsum('kli,klj->klij', a, b)
 
     def get_att_mask(self):
         """ Mask (batchsize, n_nodes, n_nodes) for attention encoder.
@@ -66,12 +73,12 @@ class AgentVRP():
             False -> shouldn't mask (can visit)
         """
         # Remove depot from mask (1st column)
-        att_mask = torch.squeeze(self.visited, dim=-2)[:, 1:] # (batch_size, 1, n_nodes) -> (batch_size, n_nodes-1)
+        att_mask = torch.squeeze(self.visited, dim=-2)[:, :, 1:] # (batch_size, 1, n_nodes) -> (batch_size, n_nodes-1)
         
         # Number of nodes in new instance after masking
         cur_num_nodes = self.n_loc + 1 - att_mask.sum(dim=1, keepdims=True)  # (batch_size, 1)
 
-        att_mask = torch.cat((torch.zeros(att_mask.shape[0], 1), att_mask), dim=-1)  # add depot -> (batch_size, n_nodes)
+        att_mask = torch.cat((torch.zeros(att_mask.shape[0], self.pomo_size, 1), att_mask), dim=-1)  # add depot -> (batch_size, n_nodes)
 
         ones_mask = torch.ones_like(att_mask)
 
@@ -136,13 +143,15 @@ class AgentVRP():
 
     def step(self, action):
 
+        self.selected_count += 1
         # Update current state
         selected = action[:, None]
         self.prev_a = selected
         self.from_depot = self.prev_a == 0
 
         # Shift indices by 1 since self.demand doesn't consider depot
-        selected_demand = self.demand.gather(-1, (self.prev_a - 1).clamp_min(0).view(-1, 1))  # (batch_size, 1)
+        demand_list = self.demand[:, None, :].expand(self.batch_size, self.pomo_size, -1)
+        selected_demand = demand_list.gather(-1, (self.prev_a - 1).clamp_min(0).view(-1, 1))  # (batch_size, 1)
 
         # Add current node capacity to used capacity and set it to 0 if we return from depot
         self.used_capacity = (self.used_capacity + selected_demand) * (self.from_depot == False)
