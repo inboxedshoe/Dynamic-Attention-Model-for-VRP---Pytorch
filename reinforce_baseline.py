@@ -60,7 +60,7 @@ def get_costs_rollout(model, train_batches, disable_tqdm, save_extras_path=None)
     return costs_list
 
 
-def rollout(model, dataset, batch_size = 1000, disable_tqdm = False, save_extras_path=None, train_batch=None, extra_batched=False):
+def rollout(model, dataset, batch_size=1000, disable_tqdm=False, save_extras_path=None, train_batch=None, extra_batched=False):
     # Evaluate model in greedy mode
     set_decode_type(model, "greedy")
 
@@ -288,6 +288,7 @@ def load_pt_model(path, embedding_dim=128, graph_size=20, n_encode_layers=2, dev
     """
     CAPACITIES = {10: 20.,
                   20: 30.,
+                  49: 40.,
                   50: 40.,
                   100: 50.
                   }

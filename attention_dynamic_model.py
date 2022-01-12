@@ -306,7 +306,7 @@ class AttentionDynamicModel(nn.Module):
 
                 # next step is to select node
                 if pre_selects is None:
-                    selected = self._select_node(log_p.detach())  # (batch_size,)
+                    selected = self._select_node(log_p.detach()).reshape(-1)  # (batch_size,)
                 else:
                     selected = pre_selects[pre_select_idx]
 
