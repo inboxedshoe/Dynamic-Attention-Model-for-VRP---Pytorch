@@ -83,14 +83,15 @@ def rollout(model, dataset, batch_size=1000, disable_tqdm=False, save_extras_pat
     return torch.cat(costs_list, dim=0)
 
 
-def validate(dataset, model, batch_size=1000, save_extras_path=None):
+def validate(dataset, model, batch_size=1000, save_extras_path=None, disable_tqdm=False, print_res=True):
     """Validates model on given dataset in greedy mode
     """
     # rollout will set the model to eval mode and turn it back to it's original mode after it finishes
-    val_costs = rollout(model, dataset, batch_size=batch_size, save_extras_path=save_extras_path)
+    val_costs = rollout(model, dataset, batch_size=batch_size, save_extras_path=save_extras_path, disable_tqdm=disable_tqdm)
     set_decode_type(model, "sampling")
     mean_cost = torch.mean(val_costs)
-    print(f"Validation score: {np.round(mean_cost, 4)}")
+    if print_res:
+        print(f"Validation score: {np.round(mean_cost, 4)}")
     return mean_cost
 
 

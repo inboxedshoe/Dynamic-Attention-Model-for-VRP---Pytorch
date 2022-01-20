@@ -11,17 +11,21 @@ from utils import read_from_pickle, read_from_old_pickle
 from reinforce_baseline import validate
 
 embedding_dim = 128
-GRAPH_SIZE = 50
-val_batch_size = 1000
+GRAPH_SIZE = 200
+val_batch_size = 128
 
-model_name = "model_checkpoint_epoch_86_embeddingFixed_mixed_50_50_2021-12-25"
+model_name = "mid/baseline_checkpoint_epoch_65_mix50-100_entmax_originalEncoder_50_2022-01-15"
 
 MODEL_PATH = 'C:/Users/inbox/Desktop/Results/' + model_name
-VAL_SET_PATH = 'data/CVRP/vrp100_test_seed1234.pkl'
+VAL_SET_PATH = 'data/CVRP/vrp'+ str(GRAPH_SIZE)+'_test_seed1234.pkl'
+#VAL_SET_PATH = 'C:/Users/inbox/Desktop/Validation_dataset_200.pkl'
+
+#model
+GRAPH_SIZE = 100
 
 #path_2 = "valsets/Validation_dataset_VRP_20_2021-11-28.pkl"
 # Create and save validation dataset
-#d1 = read_from_pickle(path_2)
+#validation_dataset = read_from_pickle(VAL_SET_PATH)
 validation_dataset = read_from_old_pickle(VAL_SET_PATH)
 
 validation_dataset = tuple([torch.tensor(x) for x in validation_dataset])
@@ -30,15 +34,15 @@ print(get_cur_time(), 'validation dataset loaded')
 
 save_extras_path = None
 #save_extras_path = "model_extras/" + model_name + "/outputs.pkl"
-normalize_cost = True
-save_extras=False
+normalize_cost = False
+save_extras = False
 
 # Initialize model
 
 model = load_pt_model(MODEL_PATH,
                          embedding_dim=embedding_dim,
                          graph_size=GRAPH_SIZE,
-                         attention_type=0,
+                         attention_type=1,
                          attention_neighborhood=0,
                          batch_norm=False,
                          size_context=False,
